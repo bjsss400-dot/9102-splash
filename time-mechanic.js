@@ -1,6 +1,8 @@
 // TIME MECHANIC: an 80-second day, moving sky objects, and timed splash events.
 // Developed with assistance from OpenAI Codex (ChatGPT): palette interpolation,
 // sun/moon motion, star twinkling, splash timing, ripples, and these comments.
+// millis() counts milliseconds since the sketch started, so timing does not depend on frame rate.
+// Extra timing reference: https://p5js.org/reference/p5/millis/
 
 const DAY_LENGTH = 80000; // milliseconds per complete day/night cycle
 const START_PHASE = 0.02;
@@ -58,7 +60,8 @@ const TIME_PALETTES = {
   }
 };
 
-// Determine which time use which color, and how long it shall last
+// phase is the fraction of one day: 0 = start, 0.5 = halfway, 1 = next day
+// Using the same palette twice keeps those colors still for a short time
 const TIME_LIGHT_STOPS = [
   { phase: 0, palette: 'day', night: 0 },
   { phase: 0.10, palette: 'day', night: 0 },
@@ -75,13 +78,18 @@ const TIME_LIGHT_STOPS = [
 // Control each ripple and splash's time and duration
 const TIME_SPLASH_DURATION = { rising: 480, peak: 180, falling: 620, fading: 600 };
 const TIME_RIPPLE_DURATION = 2200;
-const TIME_MAX_RIPPLES = 36;// To prevent too many clicks
+const TIME_MAX_RIPPLES = 36; // Limit how many ripples can stay on screen
 
-//To define the "current" state of the color
+// List the color names so a normal loop can update them
+const TIME_COLOUR_NAMES = [
+  'skyTop', 'skyMid', 'skyLow', 'roof', 'roofEdge', 'wall', 'wallSide',
+  'frame', 'glassDark', 'glassLight', 'hedge', 'trunk', 'leafDark', 'leafLight',
+  'deck', 'shadow', 'coping', 'poolEdge', 'waterTop', 'waterBottom', 'squiggle',
+  'boardTop', 'boardSide', 'foam'
+];
+
+// setupTimeMechanic fills the current colors before the first frame is drawn
 let lightColours = {};
-for (let name in TIME_PALETTES.day) {
-  lightColours[name] = TIME_PALETTES.day[name].slice();
-}
 let nightAmount = 0; // 0 = daylight, 1 = full night; also used by window reflections
 let dayPhase = START_PHASE;
 let timeShift = 0;
@@ -90,12 +98,12 @@ let timeRipples = [];
 let timeStars = [];
 let timeSplashSeed = 0;
 
-//Set thhings in default, only runs once when the code is initiated
+// Set things to default when the sketch starts
 function setupTimeMechanic() {
   timeShift = millis() - START_PHASE * DAY_LENGTH;
-  splashes.length = 0;
-  timeRipples.length = 0;
-  timeStars.length = 0;
+  splashes = [];
+  timeRipples = [];
+  timeStars = [];
   timeSplashSeed = 0;
 
   for (let i = 0; i < 6; i++) {
@@ -106,17 +114,15 @@ function setupTimeMechanic() {
     });
   }
 
-  // Fixed positions avoid changing the Perlin member's global random/noise seed.
+  // % gives the remainder; these numbers spread stars without using random()
+  // This keeps the stars fixed and leaves the Perlin member's random seed alone
   for (let i = 0; i < 55; i++) {
     timeStars.push({
-      // Use different numbers to ensure stars will be  seperated in different places
-      // and to ensure everytime you use the code they will be in the same spot.
       x: 0.025 + ((i * 37) % 101) / 101 * 0.95,
       y: 0.02 + ((i * 23) % 97) / 97 * (HORIZON - 0.04),
       size: 1 + (i % 3) * 0.55,
       speed: 0.65 + (i % 5) * 0.17,
-      //To make the star have different sparkling time
-      offset: i * 1.7
+      offset: i * 1.7 // Start each star at a different point in its sparkle
     });
   }
   updateTimeMechanic();
@@ -124,42 +130,52 @@ function setupTimeMechanic() {
 
 // Update the time, splashes and ripples in every frame
 function updateTimeMechanic() {
-  const now = millis();
-  dayPhase = (((now - timeShift) / DAY_LENGTH) % 1 + 1) % 1;
+  let now = millis();
+  // % removes complete days; dividing by DAY_LENGTH gives progress from 0 to 1
+  let timeInDay = (now - timeShift) % DAY_LENGTH;
+  if (timeInDay < 0) {
+    timeInDay = timeInDay + DAY_LENGTH;
+  }
+  dayPhase = timeInDay / DAY_LENGTH;
   updateTimeLighting();
-
   // Update each splash that is still active
   for (let splash of splashes) {
     if (splash.active) {
       updateTimedSplash(splash, now);
     }
   }
- // Remove finished ripples from the end of the list to avoid skipping any
-  for (let i = timeRipples.length - 1; i >= 0; i--) {
-    if (now - timeRipples[i].startedAt >= TIME_RIPPLE_DURATION) {
-      timeRipples.splice(i, 1);
+  // Keep only the ripples that have not finished
+  let remainingRipples = [];
+  for (let ripple of timeRipples) {
+    if (now - ripple.startedAt < TIME_RIPPLE_DURATION) {
+      remainingRipples.push(ripple);
     }
   }
+  timeRipples = remainingRipples;
 }
 
 // To make the change start slowly, become faster, then slow down at the end
 function easeTimeBlend(amount) {
-  return (1 - cos(constrain(amount, 0, 1) * PI)) / 2;
+  amount = constrain(amount, 0, 1);
+  // cos goes from 1 to -1; (1 - cos) / 2 changes that range to 0 to 1
+  return (1 - cos(amount * PI)) / 2;
 }
 
 // Change the colors of the scene according to the current time
 function updateTimeLighting() {
   for (let i = 0; i < TIME_LIGHT_STOPS.length - 1; i++) {
-    const from = TIME_LIGHT_STOPS[i];
-    const to = TIME_LIGHT_STOPS[i + 1];
+    let from = TIME_LIGHT_STOPS[i];
+    let to = TIME_LIGHT_STOPS[i + 1];
     // Find which two color settings the current time is between
     if (dayPhase >= from.phase && dayPhase < to.phase) {
-      // Calculate how far the colors have changed towards the next setting
-      const amount = easeTimeBlend((dayPhase - from.phase) / (to.phase - from.phase));
-      for (let name in lightColours) {
-        lightColours[name] = mixColour(
-          TIME_PALETTES[from.palette][name], TIME_PALETTES[to.palette][name], amount
-        );
+      // Progress is 0 at 'from', 1 at 'to', and 0.5 halfway between them
+      let progress = (dayPhase - from.phase) / (to.phase - from.phase);
+      let amount = easeTimeBlend(progress);
+      let fromColours = TIME_PALETTES[from.palette];
+      let toColours = TIME_PALETTES[to.palette];
+      // [name] uses a color name from the list, such as 'skyTop'
+      for (let name of TIME_COLOUR_NAMES) {
+        lightColours[name] = mixColour(fromColours[name], toColours[name], amount);
       }
       // Change the night level together with the colors
       nightAmount = lerp(from.night, to.night, amount);
@@ -170,17 +186,18 @@ function updateTimeLighting() {
 
 // Mix the red, green and blue values of two colors using the same amount
 function mixColour(colourA, colourB, amount) {
-  return [
-    lerp(colourA[0], colourB[0], amount),
-    lerp(colourA[1], colourB[1], amount),
-    lerp(colourA[2], colourB[2], amount)
-  ];
+  let red = lerp(colourA[0], colourB[0], amount);
+  let green = lerp(colourA[1], colourB[1], amount);
+  let blue = lerp(colourA[2], colourB[2], amount);
+  return [red, green, blue];
 }
 
 // Switch to the time selected by the keyboard controls
 function jumpToTimeOfDay(index) {
   // Only accept the four time choices, numbered from 0 to 3
-  if (!Number.isInteger(index) || index < 0 || index >= JUMP_PHASES.length) return;
+  if (index !== 0 && index !== 1 && index !== 2 && index !== 3) {
+    return;
+  }
   timeShift = millis() - JUMP_PHASES[index] * DAY_LENGTH;
   dayPhase = JUMP_PHASES[index];
   // Update the colors immediately without changing the splash timers
@@ -189,58 +206,84 @@ function jumpToTimeOfDay(index) {
 
 // To show the current time period's name at the top of the picture
 function getTimeOfDayName() {
-  if (dayPhase < 0.125 || dayPhase >= 0.875) return 'day';
-  if (dayPhase < 0.375) return 'sunset';
-  if (dayPhase < 0.625) return 'night';
-  return 'sunrise';
+  if (dayPhase < 0.125 || dayPhase >= 0.875) {
+    return 'day';
+  } else if (dayPhase < 0.375) {
+    return 'sunset';
+  } else if (dayPhase < 0.625) {
+    return 'night';
+  } else {
+    return 'sunrise';
+  }
 }
 
 // Draw the sky objects before the house so the house can cover them
 function drawSkyObjects() {
   push();
   noStroke();
-  const seconds = millis() / 1000;
- // Make stars appear gradually as the scene gets darker
-  const starVisibility = easeTimeBlend((nightAmount - 0.15) / 0.85);
+  let seconds = millis() / 1000;
+  // Make stars appear gradually as the scene gets darker
+  let starVisibility = easeTimeBlend((nightAmount - 0.15) / 0.85);
   if (starVisibility > 0) {
     for (let star of timeStars) {
-      // Use each star's speed and offset to give it a different sparkling time
-      const twinkle = 0.72 + 0.28 * sin(seconds * star.speed + star.offset);
+      // sin goes back and forth from -1 to 1, so brightness changes from 0.44 to 1
+      let twinkle = 0.72 + 0.28 * sin(seconds * star.speed + star.offset);
       fill(239, 244, 255, 220 * starVisibility * twinkle);
       ellipse(picX(star.x), picY(star.y), star.size, star.size);
     }
   }
 
-  // Give the sun and moon different times to travel across the sky
-  const sunProgress = ((dayPhase + 0.25) % 1) * 2;
-  const moonProgress = ((dayPhase + 0.75) % 1) * 2;
-  if (sunProgress <= 1) drawTimeOrb(sunProgress, false);
-  if (moonProgress <= 1) drawTimeOrb(moonProgress, true);
+  // Shift their starting times; * 2 makes each journey last half a day
+  // Only draw progress from 0 to 1; values above 1 mean it is below the horizon
+  let sunProgress = ((dayPhase + 0.25) % 1) * 2;
+  let moonProgress = ((dayPhase + 0.75) % 1) * 2;
+  if (sunProgress <= 1) {
+    drawTimeOrb(sunProgress, false);
+  }
+  if (moonProgress <= 1) {
+    drawTimeOrb(moonProgress, true);
+  }
   pop();
 }
 
 // Use the same movement for the sun and moon, but different sizes and colors
 function drawTimeOrb(progress, isMoon) {
-  const elevation = sin(progress * PI);
-  const nearHorizon = 1 - elevation;
+  // sin rises from 0 to 1, then falls to 0 as progress moves from 0 to 1
+  let elevation = sin(progress * PI);
+  let nearHorizon = 1 - elevation;
   // Move from the right side of the picture to the left side
-  const x = picX(lerp(0.92, 0.08, progress));
+  let x = picX(lerp(0.92, 0.08, progress));
   // Make a curved path and keep the sun visible before it goes behind the roof
-  const arch = Math.pow(elevation, 0.75);
-  const y = picY(lerp(HORIZON + 0.02, 0.28, progress) - 0.30 * arch);
-  // Make the sun and moon bigger and warmer in color near the horizon
-  const diameter = PIC_W * (isMoon ? 0.033 : 0.037) * (1 + 0.65 * nearHorizon);
-  const colour = isMoon
-    ? mixColour([242, 246, 220], [255, 228, 184], nearHorizon)
-    : mixColour([255, 249, 204], [255, 159, 77], nearHorizon);
-    // Make them appear and disappear gradually at the start and end of the path
-  const visibility = easeTimeBlend(progress / 0.035) * easeTimeBlend((1 - progress) / 0.035);
+  // Extra technique: Math.pow raises a number to a power; 0.75 keeps the existing flatter arc
+  // Reference: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/pow
+  let arch = Math.pow(elevation, 0.75);
+  let baseHeight = lerp(HORIZON + 0.02, 0.28, progress);
+  let y = picY(baseHeight - 0.30 * arch); // Smaller y means higher on the screen
 
-   // Draw several transparent circles to create a soft glow
+  // Start with the sun's settings, then change them if this is the moon
+  let size = 0.037;
+  let highColour = [255, 249, 204];
+  let lowColour = [255, 159, 77];
+  let glowAlpha = 7;
+  if (isMoon) {
+    size = 0.033;
+    highColour = [242, 246, 220];
+    lowColour = [255, 228, 184];
+    glowAlpha = 5;
+  }
+  // Make the sun and moon bigger and warmer in color near the horizon
+  let diameter = PIC_W * size * (1 + 0.65 * nearHorizon);
+  let colour = mixColour(highColour, lowColour, nearHorizon);
+  // Fade during the first and last 3.5% of the path
+  let fadeIn = easeTimeBlend(progress / 0.035);
+  let fadeOut = easeTimeBlend((1 - progress) / 0.035);
+  let visibility = fadeIn * fadeOut;
+
+  // Draw several transparent circles to create a soft glow
   for (let layer = 6; layer >= 1; layer--) {
-    const size = diameter * (1 + layer * 0.24);
-    fill(colour[0], colour[1], colour[2], visibility * (isMoon ? 5 : 7));
-    ellipse(x, y, size, size);
+    let glowSize = diameter * (1 + layer * 0.24);
+    fill(colour[0], colour[1], colour[2], visibility * glowAlpha);
+    ellipse(x, y, glowSize, glowSize);
   }
   // Draw the main circle of the sun or moon over the glow
   fill(colour[0], colour[1], colour[2], 255 * visibility);
@@ -249,29 +292,40 @@ function drawTimeOrb(progress, isMoon) {
 
 // Start a splash when the input or audio code calls this function
 function triggerSplash(x, power, y) {
-  // Use the default strength and position if they are not provided
-  power = power ?? 1;
-  y = y ?? SPLASH_BASE_Y;
-  if (!Number.isFinite(x) || !Number.isFinite(power) || !Number.isFinite(y)) return;
+  // x and y use 0 to 1 across the picture; use defaults for missing arguments
+  if (power == undefined) {
+    power = 1;
+  }
+  if (y == undefined) {
+    y = SPLASH_BASE_Y;
+  }
+  // Number.isFinite rejects NaN, Infinity and non-numbers before drawing
+  // Extra reference: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/isFinite
+  if (!Number.isFinite(x) || !Number.isFinite(power) || !Number.isFinite(y) || splashes.length == 0) {
+    return;
+  }
 
-  // Find an unused splash, or replace the oldest one if all six are active
-  let splash = splashes.find(item => !item.active);
-  if (!splash) {
-    splash = splashes[0];
-    for (let item of splashes) {
-      if (item.startedAt < splash.startedAt) splash = item;
+  // Use the first free splash; if all are active, keep the oldest one found
+  let splash = splashes[0];
+  for (let item of splashes) {
+    if (item.active == false) {
+      splash = item;
+      break;
+    }
+    if (item.startedAt < splash.startedAt) {
+      splash = item;
     }
   }
-  if (!splash) return;
 
-  const now = millis();
+  let now = millis();
   splash.active = true;
-   // Keep the splash's center inside the pool and limit its strength
+  // Keep the splash's center inside the pool and limit its strength
   splash.x = constrain(x, 0.02, 0.98);
   splash.y = constrain(y, 0.68, 0.95);
   splash.power = constrain(power, 0.2, 2);
   // Give each new splash a different seed for the Perlin member's drawing code
-  splash.seed = ++timeSplashSeed;
+  timeSplashSeed = timeSplashSeed + 1;
+  splash.seed = timeSplashSeed;
   // Reset the splash's time, height and visibility for a new animation
   splash.startedAt = now;
   splash.phaseStart = now;
@@ -284,12 +338,11 @@ function triggerSplash(x, power, y) {
 
 // Determine which stage the splash is in by checking how long it has lasted
 function updateTimedSplash(splash, now) {
-  const age = now - splash.startedAt;
+  let age = now - splash.startedAt;
   // Calculate when each stage should finish
-  const riseEnd = TIME_SPLASH_DURATION.rising;
-  const peakEnd = riseEnd + TIME_SPLASH_DURATION.peak;
-  const fallEnd = peakEnd + TIME_SPLASH_DURATION.falling;
-  const fadeEnd = fallEnd + TIME_SPLASH_DURATION.fading;
+  let riseEnd = TIME_SPLASH_DURATION.rising;
+  let peakEnd = riseEnd + TIME_SPLASH_DURATION.peak;
+  let fallEnd = peakEnd + TIME_SPLASH_DURATION.falling;
 
   // Create the second ripple only once when the splash falls back
   // Use its planned start time to keep it on time even if a frame is missed
@@ -297,40 +350,39 @@ function updateTimedSplash(splash, now) {
     addTimeRipple(splash, splash.startedAt + fallEnd, 1);
     splash.returnRippleCreated = true;
   }
+  splash.alpha = 1; // Stay fully visible until the fading stage
   if (age < riseEnd) {
     // Make the splash rise quickly, then slow down near the top
     splash.phase = 'rising';
     splash.phaseStart = splash.startedAt;
-    const amount = constrain(age / riseEnd, 0, 1);
-    splash.height = 1 - (1 - amount) * (1 - amount); // Fast rise, slowing at the top.
-    splash.alpha = 1;
+    let progress = constrain(age / riseEnd, 0, 1);
+    let remaining = 1 - progress;
+    // At halfway, height is 1 - 0.5 * 0.5 = 0.75, so most of the rise happens early
+    splash.height = 1 - remaining * remaining;
   } else if (age < peakEnd) {
     // Keep the splash at its highest point for a short time
     splash.phase = 'peak';
     splash.phaseStart = splash.startedAt + riseEnd;
     splash.height = 1;
-    splash.alpha = 1;
   } else if (age < fallEnd) {
-    // Make the splash fall slowly at first, then become faster
+   // Make the splash fall slowly at first, then become faster
     splash.phase = 'falling';
     splash.phaseStart = splash.startedAt + peakEnd;
-    const amount = (age - peakEnd) / TIME_SPLASH_DURATION.falling;
-    splash.height = lerp(1, 0.16, amount * amount); // Slow start, accelerating downward.
-    splash.alpha = 1;
-  } else if (age < fadeEnd) {
+    let progress = (age - peakEnd) / TIME_SPLASH_DURATION.falling;
+    // At halfway, progress * progress is only 0.25, so the fall starts slowly
+    splash.height = lerp(1, 0.16, progress * progress);
+  } else {
     // Make the remaining splash shorter and more transparent until it disappears
     splash.phase = 'fading';
     splash.phaseStart = splash.startedAt + fallEnd;
-    const amount = (age - fallEnd) / TIME_SPLASH_DURATION.fading;
-    splash.height = lerp(0.16, 0, easeTimeBlend(amount));
-    splash.alpha = 1 - easeTimeBlend(amount);
-  } else {
-    // Stop this splash so it can be used again
-    splash.active = false;
-    splash.phase = 'fading';
-    splash.phaseStart = splash.startedAt + fallEnd;
-    splash.height = 0;
-    splash.alpha = 0;
+    let progress = (age - fallEnd) / TIME_SPLASH_DURATION.fading;
+    // easeTimeBlend stops at 1, so height and alpha stay at 0 after the fade
+    let fadeAmount = easeTimeBlend(progress);
+    splash.height = lerp(0.16, 0, fadeAmount);
+    splash.alpha = 1 - fadeAmount;
+    if (progress >= 1) {
+      splash.active = false; // This splash is ready to be used again
+    }
   }
 }
 
@@ -339,30 +391,39 @@ function addTimeRipple(splash, startedAt, strength) {
   timeRipples.push({
     x: splash.x, y: splash.y, power: splash.power, startedAt: startedAt, strength: strength
   });
-  // Remove the first ripple in the list if there are too many
-  if (timeRipples.length > TIME_MAX_RIPPLES) timeRipples.shift();
+  // If there are too many, keep only the newest ripples
+  if (timeRipples.length > TIME_MAX_RIPPLES) {
+    let remainingRipples = [];
+    let firstToKeep = timeRipples.length - TIME_MAX_RIPPLES;
+    for (let i = firstToKeep; i < timeRipples.length; i++) {
+      remainingRipples.push(timeRipples[i]);
+    }
+    timeRipples = remainingRipples;
+  }
 }
 
 // Draw ripples that spread across the water and slowly disappear
 function drawRipples() {
   push();
   noFill();
-  const now = millis();
-  const colour = lightColours.squiggle;
+  let now = millis();
+  let colour = lightColours.squiggle;
   for (let ripple of timeRipples) {
-    // Calculate how far the ripple has reached in its lifetime
-    const progress = constrain((now - ripple.startedAt) / TIME_RIPPLE_DURATION, 0, 1);
+    let progress = constrain((now - ripple.startedAt) / TIME_RIPPLE_DURATION, 0, 1);
     // Make ripples near the bottom of the picture slightly bigger
-    const depthScale = lerp(0.8, 1.15, (ripple.y - 0.68) / 0.27);
+    let depthScale = lerp(0.8, 1.15, (ripple.y - 0.68) / 0.27);
     // Let the ripple spread quickly at first, then slow down
-    const expansion = 1 - (1 - progress) * (1 - progress);
+    let remaining = 1 - progress;
+    let expansion = 1 - remaining * remaining;
     let radius = lerp(6, 80 + ripple.power * 28, expansion) * depthScale;
-    // Limit the size so the ripple stays between the top and bottom of the pool
-    const roomAbove = picY(ripple.y) - picY(WATER_TOP) - 2;
-    const roomBelow = picY(1) - picY(ripple.y) - 2;
-    radius = Math.min(radius, Math.min(roomAbove, roomBelow) / PERSPECTIVE);
+    // min chooses the smaller value, keeping the ripple inside the pool
+    let roomAbove = picY(ripple.y) - picY(WATER_TOP) - 2;
+    let roomBelow = picY(1) - picY(ripple.y) - 2;
+    // The visible height is flattened by PERSPECTIVE, so divide to find the radius limit
+    let radiusLimit = min(roomAbove, roomBelow) / PERSPECTIVE;
+    radius = min(radius, radiusLimit);
     // Make the ripple more transparent as time passes
-    const alpha = 155 * ripple.strength * (1 - progress) * (1 - progress);
+    let alpha = 155 * ripple.strength * remaining * remaining;
     stroke(colour[0], colour[1], colour[2], alpha);
     strokeWeight(1.4 * depthScale);
     // Draw a flat ellipse to make the ripple look like it is lying on the water
