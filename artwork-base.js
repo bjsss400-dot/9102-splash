@@ -98,56 +98,132 @@ function drawHouse() {
   rect(picX(0), picY(0.246), PIC_W * 0.78, PIC_H * 0.003);
   fill(mixColour(lightColours.roof, [255, 255, 255], 0.4));
   rect(picX(0.47), picY(0.217), PIC_W * 0.15, PIC_H * 0.007);
+  fill(255, 255, 255, 150);
+  rect(picX(0), picY(0.224), PIC_W * 0.78, 1.5);
 }
 
-// The glass wall on the left. By day it is dark grey and mirrors the palms and the city;
-// at night the lights are on and it glows yellow (the colour comes from lightColours).
+// The buildings reflected in the glass: left edge, right edge and top of each dark block
+// (fractions of the picture). Together they make a skyline, like in the painting.
+const SKYLINE = [
+  { left: 0.000, right: 0.048, top: 0.290 },
+  { left: 0.048, right: 0.136, top: 0.282 },
+  { left: 0.146, right: 0.190, top: 0.290 },
+  { left: 0.190, right: 0.322, top: 0.316 },
+  { left: 0.322, right: 0.410, top: 0.304 },
+  { left: 0.010, right: 0.030, top: 0.272 },     // a few smaller blocks on top, for a stepped look
+  { left: 0.074, right: 0.100, top: 0.268 },
+  { left: 0.150, right: 0.178, top: 0.275 },
+  { left: 0.345, right: 0.372, top: 0.290 }
+];
+
+// The glass wall on the left. By day it mirrors the outside: a pale grey sky, dark buildings,
+// the dark ground and a few palms. At night the lights are on and it glows yellow
+// (the colours come from lightColours). It is drawn in layers, back to front.
 function drawGlassWall() {
   noStroke();
+  const glassTop = 0.252;
+  const glassBottom = 0.448;
+  const glassWidth = 0.412;
 
-  // the dark glass, and a lighter pane at the far left
-  fill(lightColours.glassDark);
-  rect(picX(0), picY(0.252), PIC_W * 0.412, PIC_H * 0.196);
-  fill(lightColours.glassLight);
-  rect(picX(0), picY(0.252), PIC_W * 0.155, PIC_H * 0.196);
+  // 1) the sky in the glass: a pale grey, a little lighter than the glass itself
+  fill(mixColour(lightColours.glassLight, [255, 255, 255], 0.32));
+  rect(picX(0), picY(glassTop), PIC_W * glassWidth, PIC_H * (glassBottom - glassTop));
 
-  // reflected buildings in the left pane: five dark towers of different heights
-  fill(0, 0, 0, 45);
-  for (let i = 0; i < 5; i++) {
-    let towerHeight = 0.05 + (i * 7 % 4) * 0.02;
-    rect(picX(0.01 + i * 0.028), picY(0.40 - towerHeight), PIC_W * 0.022, PIC_H * towerHeight);
+  // 2) the buildings: grey blocks, darker than the sky, that run down to the bottom of the glass
+  fill(mixColour(lightColours.glassDark, lightColours.glassLight, 0.3));
+  for (let i = 0; i < SKYLINE.length; i++) {
+    rect(picX(SKYLINE[i].left), picY(SKYLINE[i].top),
+         PIC_W * (SKYLINE[i].right - SKYLINE[i].left), PIC_H * (glassBottom - SKYLINE[i].top));
   }
 
-  // reflected palms: a trunk and a small crown of lines. They lean a little with the wind.
-  drawReflectedPalm(0.32, 0.31, 1);
-  drawReflectedPalm(0.105, 0.335, 0.6);
-  drawReflectedPalm(0.285, 0.365, 0.6);
+  // 3) the ground in the glass is darker still, with a few dark bushes on it
+  fill(0, 0, 0, 40);
+  rect(picX(0), picY(0.40), PIC_W * glassWidth, PIC_H * (glassBottom - 0.40));
+  drawReflectedBush(0.096, 0.425);
+  drawReflectedBush(0.262, 0.432);
+  drawReflectedBush(0.352, 0.434);
 
-  // the frames between the panes (a thin double post) and the beige curtains at the sides
-  fill(lightColours.frame);
-  rect(picX(0.155), picY(0.252), 3, PIC_H * 0.196);
-  rect(picX(0.161), picY(0.252), 3, PIC_H * 0.196);
-  rect(picX(0.405), picY(0.252), PIC_W * 0.007, PIC_H * 0.196);
+  // 4) the palms outside, reflected: a big one, a small one, and one on the left
+  drawReflectedPalm(0.327, 0.314, 0.093, 1);
+  drawReflectedPalm(0.297, 0.376, 0.07, 0.6);
+  drawReflectedPalm(0.096, 0.345, 0.095, 0.75);
 
-  fill(lightColours.frame[0], lightColours.frame[1], lightColours.frame[2], 230);
-  rect(picX(0.131), picY(0.252), PIC_W * 0.022, PIC_H * 0.196);
-  rect(picX(0.362), picY(0.252), PIC_W * 0.04, PIC_H * 0.196);
+  // 5) the white posts between the panes, and the curtains, which have vertical folds
+  let post = mixColour(lightColours.frame, [255, 255, 255], 0.6);
+  fill(post);
+  rect(picX(0.048) - 1.5, picY(glassTop), 3, PIC_H * (glassBottom - glassTop));
+  rect(picX(0.231) - 1.5, picY(glassTop), 3, PIC_H * (glassBottom - glassTop));
+  rect(picX(0.320) - 1.5, picY(glassTop), 3, PIC_H * (glassBottom - glassTop));
+  rect(picX(0.1363), picY(glassTop), PIC_W * 0.0102, PIC_H * (glassBottom - glassTop));   // the thick post
+  rect(picX(0.406), picY(glassTop), PIC_W * 0.006, PIC_H * (glassBottom - glassTop));     // the post at the end
+
+  drawCurtain(0.1117, 0.1363);
+  drawCurtain(0.362, 0.406);
+
+  // the thin white sill under the glass
+  fill(post);
+  rect(picX(0), picY(glassBottom), PIC_W * glassWidth, PIC_H * (DECK_TOP - glassBottom));
 }
 
-// One palm seen in the glass: a thin trunk down to the ground and six short lines for the crown.
-function drawReflectedPalm(x, crownY, size) {
-  let lean = wind.value * 0.04;
+// A small dark bush on the ground in the glass: a cluster of little overlapping ovals.
+function drawReflectedBush(x, y) {
+  fill(0, 0, 0, 55 * (1 - nightAmount * 0.5));
+  ellipse(picX(x), picY(y), PIC_W * 0.028, PIC_H * 0.02);
+  ellipse(picX(x) - 7, picY(y) + 2, PIC_W * 0.02, PIC_H * 0.014);
+  ellipse(picX(x) + 8, picY(y) + 1, PIC_W * 0.022, PIC_H * 0.016);
+  ellipse(picX(x) + 1, picY(y) - 4, PIC_W * 0.016, PIC_H * 0.012);
+}
+
+// A beige curtain: a flat panel with many thin darker lines down it, like folds.
+function drawCurtain(left, right) {
+  let beige = mixColour(lightColours.roof, lightColours.wall, 0.35);
+  noStroke();
+  fill(beige);
+  rect(picX(left), picY(0.252), PIC_W * (right - left), PIC_H * 0.196);
+
+  stroke(0, 0, 0, 22);
+  strokeWeight(1);
+  for (let x = picX(left) + 2; x < picX(right); x += 3.5) {
+    line(x, picY(0.252), x, picY(0.448));
+  }
+  noStroke();
+}
+
+// One palm seen in the glass: a thin dark trunk and a small crown of drooping fronds.
+// A frond is a few short pieces, each turning a little towards the ground, with two tiny leaves
+// on each piece. The palm leans a little with the wind.
+function drawReflectedPalm(x, crownY, trunkLength, size) {
+  let ink = 95 * (1 - nightAmount * 0.5);    // dark grey by day, fainter at night
 
   push();
   translate(picX(x), picY(crownY));
-  rotate(lean);
-  stroke(0, 0, 0, 70);
+  rotate(wind.value * 0.03);
+
+  stroke(0, 0, 0, ink);
   strokeWeight(2 * size);
-  line(0, 0, 0, PIC_H * 0.13 * size);        // trunk
-  strokeWeight(1.5 * size);
-  for (let i = 0; i < 6; i++) {
-    let angle = -PI + (i + 0.5) * PI / 6;     // from left, over the top, to the right
-    line(0, 0, cos(angle) * 20 * size, sin(angle) * 14 * size + 4 * size);
+  line(0, 0, 0, PIC_H * trunkLength);          // the trunk
+
+  for (let f = 0; f < 8; f++) {
+    let angle = -PI + (f + 0.5) * PI / 8;      // from left, over the top, to the right
+    let droop = 1;
+    if (cos(angle) < 0) {
+      droop = -1;
+    }
+
+    push();
+    rotate(angle);
+    strokeWeight(1.3 * size);
+    for (let j = 0; j < 6; j++) {
+      // the pieces get shorter and the two tiny leaves smaller towards the tip
+      let pieceLength = (4.6 - j * 0.35) * size;
+      let leafLength = (3 - j * 0.35) * size;
+      line(0, 0, pieceLength, 0);
+      line(0, 0, leafLength * 0.7, leafLength * 0.8);
+      line(0, 0, leafLength * 0.7, -leafLength * 0.8);
+      translate(pieceLength, 0);
+      rotate(droop * 0.2);
+    }
+    pop();
   }
   pop();
   noStroke();
@@ -180,19 +256,29 @@ function drawDeck() {
   rect(picX(0), picY(DECK_TOP), PIC_W, PIC_H * (DECK_BOTTOM - DECK_TOP));
 }
 
-// The director's chair outside the window: cloth seat and back, crossed legs.
+// The director's chair outside the window: a white canvas back and seat on a dark frame with
+// crossed legs, and a soft shadow on the deck.
 function drawChair() {
   noStroke();
-  fill(lightColours.frame);
-  rect(picX(0.210), picY(0.408), PIC_W * 0.044, PIC_H * 0.020);   // the back
-  rect(picX(0.208), picY(0.432), PIC_W * 0.048, PIC_H * 0.010);   // the seat
 
-  stroke(lightColours.roofEdge);
-  strokeWeight(2);
-  line(picX(0.206), picY(0.428), picX(0.258), picY(0.428));       // the arm rail
-  line(picX(0.212), picY(0.442), picX(0.252), picY(0.470));       // the crossed legs
-  line(picX(0.252), picY(0.442), picX(0.212), picY(0.470));
+  // the shadow on the deck
+  fill(0, 0, 0, 32);
+  ellipse(picX(0.236), picY(0.478), PIC_W * 0.075, PIC_H * 0.012);
+
+  // the dark frame: two back posts, the arm rails, and the crossed legs
+  stroke(45, 45, 48);
+  strokeWeight(1.6);
+  line(picX(0.202), picY(0.410), picX(0.202), picY(0.447));
+  line(picX(0.252), picY(0.410), picX(0.252), picY(0.447));
+  line(picX(0.198), picY(0.440), picX(0.256), picY(0.440));
+  line(picX(0.204), picY(0.472), picX(0.243), picY(0.438));
+  line(picX(0.249), picY(0.470), picX(0.211), picY(0.438));
+
+  // the white canvas: the back and the seat
   noStroke();
+  fill(mixColour(lightColours.frame, [255, 255, 255], 0.55));
+  rect(picX(0.202), picY(0.410), PIC_W * 0.050, PIC_H * 0.017);
+  rect(picX(0.210), picY(0.437), PIC_W * 0.040, PIC_H * 0.009);
 }
 
 function drawPool() {

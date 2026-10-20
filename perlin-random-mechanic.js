@@ -159,7 +159,7 @@ function drawOneSplash(thisSplash) {
   let baseY = picY(thisSplash.y);
   let power = thisSplash.power;
 
-  let plumeHeight = PIC_H * 0.28 * (0.6 + 0.4 * power) * depthScale * reach;   // how tall it is right now
+  let plumeHeight = PIC_H * 0.28 * (0.4 + 0.6 * power) * depthScale * reach;   // how tall it is right now
   let halfWidth = 68 * depthScale * (0.75 + 0.25 * power);                     // half the width of the cloud
   let alpha = 255 * thisSplash.alpha;
   let lean = wind.value * 10 * reach;                                          // the wind pushes the top sideways
