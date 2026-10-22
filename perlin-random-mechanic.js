@@ -1,5 +1,10 @@
 // perlin-random-mechanic.js
-// The Perlin / random member takes over this file and extends it.
+// Owner: Aokun Liu (Okun) - Perlin noise and randomness.
+// Iteration 1: a gentle natural breeze and stable, slightly different fronds.
+// Built on the group's existing palms and splash drawing, with Codex assistance.
+// References: https://p5js.org/reference/p5/noise/
+//             https://p5js.org/reference/p5/random/
+//             https://p5js.org/reference/p5/randomSeed/
 // Keep these NAMES the same: artwork-base.js and sketch.js call them.
 //
 // What this starting version already does, so the scene looks like the original painting:
@@ -7,11 +12,11 @@
 //   - they lean with the wind (wind.value), so Input's wind can be tested
 //   - the splash is one soft white cloud, painted like the original with about 1600 tiny, faint brush
 //     marks (solid white in the middle, feathery at the edges and the top) and a few droplets
-// What the Perlin / random member still has to do:
-//   - TODO: setupVariation(): give every frond its own random look (length, curve, thickness,
-//           shade, softness) with randomSeed() + random(), stored in an array of objects
-//   - TODO: updateWind(): a smooth Perlin noise breeze (two noise layers) + wind.gust
-//   - TODO: a small noise() flutter on every frond, bent by its own softness
+// This first iteration adds:
+//   - saved random length, curve, thickness, shade and softness for each frond
+//   - one slow noise() breeze added to Input's wind.gust
+//   - a small independent flutter using each frond's own noise offset
+// Later iterations can add:
 //   - TODO: the splash: replace scatter() with random() + randomSeed(splash seed), so every splash is
 //           different but does not flicker, and use noise() so neighbouring strokes get similar heights
 //   - TODO: the water texture and the light squiggles (drawWaterTexture, drawWaterLines)
@@ -25,12 +30,43 @@ const PALMS = [
 const FRONDS_PER_PALM = 12;
 const SEGMENTS = 6;           // every frond is built from 6 short pieces
 
-function setupVariation() {}
+const FROND_SEED = 9103;       // same seed = same leaf shapes after refreshing
+let frondTraits = [];         // one list of fronds for each palm
+let windNoisePosition = 0;
 
-// Placeholder: the wind is only the mouse gust. The real file adds a smooth Perlin noise breeze.
+function setupVariation() {
+  randomSeed(FROND_SEED);
+  frondTraits = [];
+  windNoisePosition = 0;
+
+  for (let p = 0; p < PALMS.length; p++) {
+    let palmFronds = [];
+    for (let f = 0; f < FRONDS_PER_PALM; f++) {
+      // Keep small ranges so both crowns still match the original scene.
+      // Store these once: calling random() while drawing would make leaves flicker.
+      palmFronds.push({
+        lengthScale: random(0.9, 1.1),
+        curl: random(0.17, 0.23),
+        width: random(1.5, 2.0),
+        tone: random(0.15, 0.85),
+        softness: random(0.8, 1.2),
+        noiseOffset: p * 1000 + f * 10 + random(0, 5)
+      });
+    }
+    frondTraits.push(palmFronds);
+  }
+}
+
 // wind.gust is written by input-controls.js; wind.value is written HERE.
 function updateWind() {
-  wind.value = wind.gust;
+  // deltaTime is milliseconds since the last frame; divide by 1000 for seconds.
+  // Cap long gaps so returning to this tab does not cause a sudden jump.
+  let seconds = min(deltaTime, 50) / 1000;
+  windNoisePosition += seconds * 0.12;
+
+  // Nearby noise samples give a continuous breeze in the range -0.25 to 0.25.
+  let breeze = (noise(windNoisePosition) - 0.5) * 0.5;
+  wind.value = breeze + wind.gust;
 }
 
 // ---------------------------------------------------------------- the palms
@@ -60,7 +96,7 @@ function drawPalms() {
     ellipse(0, 0, 6, 7);
 
     for (let f = 0; f < FRONDS_PER_PALM; f++) {
-      drawFrond(f);
+      drawFrond(p, f);
     }
     pop();
   }
@@ -68,8 +104,9 @@ function drawPalms() {
 
 // A frond is built like the trunk: 6 short pieces, each one turning a little towards the
 // ground. At the start of every piece we add two tiny leaves, one on each side.
-// Every frond is identical except for its angle: the Perlin / random member makes them differ.
-function drawFrond(f) {
+// The stored traits change the shape without generating new random values each frame.
+function drawFrond(p, f) {
+  let traits = frondTraits[p][f];
   // fronds fan out from straight left, over the top, to straight right
   let baseAngle = -PI + (f + 0.5) * PI / FRONDS_PER_PALM;
 
@@ -79,20 +116,20 @@ function drawFrond(f) {
     droop = -1;
   }
 
-  let length = PIC_W * 0.058;
+  let length = PIC_W * 0.058 * traits.lengthScale;
   let pieceLength = length / SEGMENTS;
-  let curl = droop * 0.2;
+  let curl = droop * traits.curl;
 
-  // every third frond is a lighter green (f % 3 is 0, 1 or 2)
-  let tone = (f % 3) / 2;
-  let colour = mixColour(lightColours.leafDark, lightColours.leafLight, tone * tone);
+  // Keep only a shade ratio, so Time's changing day/night palette still colours the leaves.
+  let colour = mixColour(lightColours.leafDark, lightColours.leafLight, traits.tone);
+  let flutter = (noise(traits.noiseOffset + windNoisePosition * 2) - 0.5) * 0.06;
 
   push();
-  rotate(baseAngle + wind.value * 0.2);
+  rotate(baseAngle + wind.value * 0.2 * traits.softness + flutter);
   stroke(colour);
 
   for (let j = 0; j < SEGMENTS; j++) {
-    strokeWeight(1.8);
+    strokeWeight(traits.width);
     line(0, 0, pieceLength, 0);                       // one piece of the spine
 
     // the two tiny leaves slant outwards, and get shorter towards the tip
