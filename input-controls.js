@@ -1,30 +1,57 @@
 // input-controls.js
 // MECHANIC: User input  (mouse and keyboard)
 //
-// Idea: the viewer touches the scene in three ways.
-//   click on the pool        -> a splash at that spot
-//   drag the mouse left / right -> a gust of wind in that direction
-//   move the mouse over the water -> faint ripples follow the pointer
+// Idea: the viewer touches the scene in four ways.
+//   click on the pool            -> a splash at that spot
+//   drag the mouse left / right  -> a gust of wind in that direction
+//   hold SPACE, then let go      -> THE UNSEEN DIVER: the board bends, the diver jumps, a splash appears
+//   move the mouse over the water -> TOUCHING THE WATER: faint ripples follow the pointer
 // plus keyboard shortcuts that are handy when presenting:
 //   1 2 3 4 -> jump to day, sunset, night, sunrise        M -> music on / off
 //
+// The painting shows a splash but no diver. In our piece the viewer is the diver nobody sees:
+// the longer you hold SPACE, the further and the bigger the splash.
+//
 // This member also owns index.html, style.css and artwork-base.js (the flat scene).
 //
-// AI acknowledgement: the mouse-following ripples were written with the help of Claude (Anthropic).
-// A fixed pool of rings grows and fades; the comments below explain the motion and drawing.
+// AI acknowledgement: the dive (hold SPACE) and the ripples that follow the mouse were written with the help of
+// Claude (Anthropic). The dive is a small set of states (ready, charging, flying) that counts frames while
+// SPACE is held; the board is a spring (it is pulled back to flat and keeps a little speed, so it wobbles);
+// the ripples are a fixed list of rings that grow and fade. Each part is explained in the comments below.
 //
-// Uses: mouseMoved, frameCount, sin, cos, noise, mousePressed, mouseDragged, keyPressed, key, mouseX, mouseY, width, height,
-//       if / else if, &&, !==, switch, arrays of objects, for loops, % operator, lerp.
+// Uses: mousePressed, mouseDragged, mouseMoved, keyPressed, keyReleased, key, mouseX, mouseY, width, height,
+//       frameCount, if / else if, &&, !==, switch, arrays of objects, for loops, % operator, lerp, sin, cos, noise.
 //
 // Other files use:
 //   wind.gust                 (perlin-random-mechanic.js adds it to the wind)
-//   drawWindStreaks(), drawTouchRipples()   (artwork-base.js)
+//   board.bend                (artwork-base.js bends the diving board with it)
+//   drawWindStreaks(), drawTouchRipples(), drawDiveArc()   (artwork-base.js)
 // This file calls:
 //   triggerSplash(), jumpToTimeOfDay()   (time-mechanic.js)
 //   startAudio(), toggleAudio()          (audio-mechanic.js)
 
 let lastMouseX = 0;     // where the mouse was on the previous event, to measure how far it moved
 let windStreaks = [];   // faint lines in the sky that show which way the wind blows
+
+// ---- the unseen diver (hold SPACE) ----
+const CHARGE_FRAMES = 150;  // holding SPACE for 150 frames (2.5 seconds) is a full charge
+const FLIGHT_FRAMES = 22;   // how long the diver is in the air before the splash
+const TIP_X = 0.59;         // where the end of the diving board is (fractions of the picture)
+const TIP_Y = 0.80;
+const BOARD_DROP = 0.10;    // how far the end of the board goes down when it is fully bent (fraction of the picture height)
+
+let diver = {
+  state: 'ready',           // 'ready' -> 'charging' -> 'flying' -> 'ready'
+  chargeStart: 0,           // the frame when SPACE went down
+  charge: 0,                // 0 - 1: how long SPACE has been held
+  flyStart: 0,              // the frame when SPACE was let go
+  landX: 0.52,              // where the splash will appear, decided while charging
+  landY: 0.86,
+  power: 0.6                // how big the splash will be
+};
+
+// The diving board: bend = 0 is flat, 1 is bent right down. velocity is how fast the bend is changing.
+let board = { bend: 0, velocity: 0 };
 
 // ---- touching the water (move the mouse over the pool) ----
 const MAX_TOUCH_RIPPLES = 12;
@@ -46,6 +73,7 @@ function setupInputControls() {
       length: 30 + i * 13 % 40
     });
   }
+
   for (let i = 0; i < MAX_TOUCH_RIPPLES; i++) {
     touchRipples.push({ active: false, x: 0, y: 0, radius: 0, maxRadius: 0, born: 0, seed: 0 });
   }
@@ -56,6 +84,8 @@ function updateInputControls() {
   // Easing (Week 10): the gust loses 3% of its strength every frame, so it fades away smoothly.
   wind.gust = lerp(wind.gust, 0, 0.03);
 
+  updateDiver();
+  updateBoard();
   updateTouchRipples();
 
   // move the streaks along with the wind, and wrap them round when they leave the picture
@@ -226,6 +256,70 @@ function drawTouchRipples() {
   }
 }
 
+// ---------------------------------------------------------------- the unseen diver
+
+// Runs every frame. The diver is a little machine with three states (switch, Week 4).
+function updateDiver() {
+  switch (diver.state) {
+    case 'charging':
+      // how long SPACE has been held, as a number from 0 to 1
+      diver.charge = (frameCount - diver.chargeStart) / CHARGE_FRAMES;
+      if (diver.charge > 1) {
+        diver.charge = 1;
+      }
+
+      // the longer the charge, the further away it lands and the BIGGER the splash
+      diver.landX = lerp(0.52, 0.22, diver.charge);
+      diver.landY = lerp(0.86, 0.76, diver.charge);
+      diver.power = lerp(0.5, 1.4, diver.charge);
+      break;
+
+    case 'flying':
+      // the diver is in the air for a few frames, then the splash appears
+      if (frameCount - diver.flyStart >= FLIGHT_FRAMES) {
+        triggerSplash(diver.landX, diver.power, diver.landY);   // time-mechanic.js
+        diver.state = 'ready';
+        diver.charge = 0;
+      }
+      break;
+  }
+}
+
+// The board is a spring. While SPACE is held it eases down towards the charge (lerp, Week 10).
+// When SPACE is let go, the spring pulls the bend back to 0 (flat), but the speed it already has carries it
+// past flat, so the board springs up and wobbles a little before it settles.
+function updateBoard() {
+  if (diver.state === 'charging') {
+    board.bend = lerp(board.bend, diver.charge, 0.2);
+    board.velocity = 0;
+  } else {
+    board.velocity = (board.velocity - board.bend * 0.2) * 0.82;
+    board.bend = board.bend + board.velocity;
+  }
+}
+
+// A faint arc of dots from the end of the board to where the splash will be. You never see the diver,
+// only the path they take. While charging it gets clearer; after the jump it fades away.
+function drawDiveArc() {
+  if (diver.state !== 'ready') {
+    let alpha = 70 + 120 * diver.charge;
+    if (diver.state === 'flying') {
+      alpha = alpha * (1 - (frameCount - diver.flyStart) / FLIGHT_FRAMES);
+    }
+
+    let arcHeight = 0.10 + 0.14 * diver.charge;   // how high the arc goes (fraction of the picture)
+    noStroke();
+    fill(255, 255, 255, alpha);
+    for (let k = 0; k <= 14; k++) {
+      let along = k / 14;
+      let x = lerp(TIP_X, diver.landX, along);
+      // a straight line from the board to the water, lifted by a sine hump in the middle = an arc
+      let y = lerp(TIP_Y + board.bend * BOARD_DROP, diver.landY, along) - arcHeight * sin(PI * along);
+      ellipse(picX(x), picY(y), 4, 4);
+    }
+  }
+}
+
 // ---------------------------------------------------------------- keyboard
 
 function keyPressed() {
@@ -251,6 +345,24 @@ function keyPressed() {
     case 'M':
       toggleAudio();
       break;
+    case ' ':
+      // start charging the dive (only if the diver is not already busy)
+      if (diver.state === 'ready') {
+        diver.state = 'charging';
+        diver.chargeStart = frameCount;
+        diver.charge = 0;
+      }
+      break;
+  }
+
+  return false;   // stops the browser from scrolling the page when SPACE is pressed
+}
+
+// Letting go of SPACE is the jump. The splash position and size were already decided while charging.
+function keyReleased() {
+  if (key === ' ' && diver.state === 'charging') {
+    diver.state = 'flying';
+    diver.flyStart = frameCount;
   }
 }
 
@@ -269,4 +381,3 @@ function drawWindStreaks() {
     line(windStreaks[i].x, windStreaks[i].y, windStreaks[i].x + windStreaks[i].length, windStreaks[i].y);
   }
 }
-

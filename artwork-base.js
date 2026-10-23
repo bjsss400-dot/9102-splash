@@ -54,6 +54,7 @@ function drawScene() {
   drawTouchRipples();   // input-controls.js: rings that follow the mouse over the water
   drawSplashes();       // perlin-random-mechanic.js
   drawDivingBoard();
+  drawDiveArc();        // input-controls.js: the path of the unseen diver
   drawBorder();
 }
 
