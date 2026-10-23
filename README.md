@@ -1,7 +1,7 @@
 # A Bigger Splash
 
 A p5.js group interpretation of David Hockney's painting. This branch contains
-Okun's first iteration, which adds Perlin noise and randomness to the group's
+Aokun Liu's first iteration, which adds Perlin noise and randomness to the group's
 existing code.
 
 ## How to run it
@@ -34,7 +34,7 @@ they all react together. Frond colours keep using Time's `lightColours` palette
 each frame. I didn't change any other member's JavaScript file or the splash
 timing in this iteration.
 
-## Okun's iteration 1 — natural wind and stable fronds
+## Aokun's iteration 1 — natural wind and stable fronds
 
 I started from the group's `main` commit `e1d5cac2`, so the scene, palm drawing
 structure, leaflets and painted splash were already there. My changes:
