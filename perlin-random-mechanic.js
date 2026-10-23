@@ -1,5 +1,11 @@
 // perlin-random-mechanic.js
-// The Perlin / random member takes over this file and extends it.
+// Owner: Aokun Liu (Okun) - Perlin noise and randomness.
+// Iteration 2: visible natural wind, independent fronds and a drifting pool surface.
+// Built on the group's existing palms and splash drawing.
+// References: https://p5js.org/reference/p5/noise/
+//             https://p5js.org/reference/p5/random/
+//             https://p5js.org/reference/p5/randomSeed/
+//             https://p5js.org/reference/p5/clip/
 // Keep these NAMES the same: artwork-base.js and sketch.js call them.
 //
 // What this starting version already does, so the scene looks like the original painting:
@@ -7,14 +13,14 @@
 //   - they lean with the wind (wind.value), so Input's wind can be tested
 //   - the splash is one soft white cloud, painted like the original with about 1600 tiny, faint brush
 //     marks (solid white in the middle, feathery at the edges and the top) and a few droplets
-// What the Perlin / random member still has to do:
-//   - TODO: setupVariation(): give every frond its own random look (length, curve, thickness,
-//           shade, softness) with randomSeed() + random(), stored in an array of objects
-//   - TODO: updateWind(): a smooth Perlin noise breeze (two noise layers) + wind.gust
-//   - TODO: a small noise() flutter on every frond, bent by its own softness
+// This iteration adds:
+//   - saved random length, curve, thickness, shade and softness for each frond
+//   - a continuous noise() breeze, combined with Input's wind.gust
+//   - stronger independent flutter and slightly delayed palm movement
+//   - fine water lines and six small leaves that drift in the same wind
+// Later iterations can add:
 //   - TODO: the splash: replace scatter() with random() + randomSeed(splash seed), so every splash is
 //           different but does not flicker, and use noise() so neighbouring strokes get similar heights
-//   - TODO: the water texture and the light squiggles (drawWaterTexture, drawWaterLines)
 
 // Each palm: where its foot is, how tall it is (fraction of the picture height),
 // how much the trunk bows (radians, negative = towards the left) and how thick it is.
@@ -25,12 +31,136 @@ const PALMS = [
 const FRONDS_PER_PALM = 12;
 const SEGMENTS = 6;           // every frond is built from 6 short pieces
 
-function setupVariation() {}
+const FROND_SEED = 9103;       // same seed = same leaf shapes after refreshing
+let frondTraits = [];         // one list of fronds for each palm
+let windNoisePosition = 0;
+let palmWind = [0, 0];         // the two palms take a little time to follow the wind
+let surfaceTime = 0;
+let waterTravel = 0;
+let waterMarks = [];
+let floatingLeaves = [];
 
-// Placeholder: the wind is only the mouse gust. The real file adds a smooth Perlin noise breeze.
+const WATER_MARK_COUNT = 36;
+const FLOATING_LEAF_COUNT = 6;
+
+function setupVariation() {
+  randomSeed(FROND_SEED);
+  frondTraits = [];
+  windNoisePosition = 0;
+  palmWind = [0, 0];
+  surfaceTime = 0;
+  waterTravel = 0;
+  waterMarks = [];
+  floatingLeaves = [];
+
+  for (let p = 0; p < PALMS.length; p++) {
+    let palmFronds = [];
+    for (let f = 0; f < FRONDS_PER_PALM; f++) {
+      // Keep small ranges so both crowns still match the original scene.
+      // Store these once: calling random() while drawing would make leaves flicker.
+      palmFronds.push({
+        lengthScale: random(0.9, 1.1),
+        curl: random(0.17, 0.23),
+        width: random(1.5, 2.0),
+        tone: random(0.15, 0.85),
+        softness: random(0.8, 1.2),
+        noiseOffset: p * 1000 + f * 10 + random(0, 5)
+      });
+    }
+    frondTraits.push(palmFronds);
+  }
+
+  // A loose grid spreads the marks out; random values keep it from looking tiled.
+  // Store these once. The drawing functions never create fresh random shapes.
+  const waterHeight = PIC_H * (1 - WATER_TOP);
+  for (let i = 0; i < WATER_MARK_COUNT; i++) {
+    waterMarks.push({
+      x: (i % 6 + random(0.1, 0.9)) * PIC_W / 6,
+      y: picY(WATER_TOP) + (floor(i / 6) + random(0.15, 0.85)) * waterHeight / 6,
+      length: random(24, 64),
+      weight: random(0.7, 1.2),
+      opacity: random(60, 110),
+      offset: random(100, 1000)
+    });
+  }
+
+  for (let i = 0; i < FLOATING_LEAF_COUNT; i++) {
+    floatingLeaves.push({
+      x: (i + random(0.25, 0.75)) * PIC_W / FLOATING_LEAF_COUNT,
+      y: picY(WATER_TOP) + random(0.14, 0.82) * waterHeight,
+      length: random(12, 17),
+      width: random(3.5, 5.2),
+      angle: random(-PI, PI),
+      shade: random(0.25, 0.85),
+      mobility: random(0.85, 1.15),
+      offset: random(1200, 2400),
+      vx: 0,
+      vy: 0
+    });
+  }
+}
+
 // wind.gust is written by input-controls.js; wind.value is written HERE.
 function updateWind() {
-  wind.value = wind.gust;
+  // deltaTime is milliseconds since the last frame; divide by 1000 for seconds.
+  // Cap long gaps so returning to this tab does not cause a sudden jump.
+  let seconds = min(deltaTime, 50) / 1000;
+  windNoisePosition += seconds * 0.16;
+  surfaceTime += seconds;
+
+  // Slow changes give the main breeze; a second layer adds smaller gusts.
+  let breeze = (noise(200 + windNoisePosition) - 0.5) * 1.6;
+  breeze += (noise(800 + windNoisePosition * 2.3) - 0.5) * 0.5;
+
+  // A deliberate drag takes priority over the small natural breeze.
+  // Input still owns wind.gust. This file only reads it and writes wind.value.
+  let dragAmount = constrain(abs(wind.gust) / 0.35, 0, 1);
+  let targetWind = wind.gust + breeze * (1 - 0.85 * dragAmount);
+  targetWind = constrain(targetWind, -1.65, 1.65);
+  wind.value = lerp(wind.value, targetWind, 1 - exp(-8 * seconds));
+
+  for (let p = 0; p < PALMS.length; p++) {
+    palmWind[p] = lerp(palmWind[p], wind.value, 1 - exp(-(4 + p) * seconds));
+  }
+
+  // Update the surface once per frame, here. The water hooks only draw it.
+  updateWaterSurface(seconds);
+}
+
+function updateWaterSurface(seconds) {
+  waterTravel += (2 + wind.value * 20) * seconds;
+
+  for (let mark of waterMarks) {
+    let current = 1.8 + (noise(mark.offset, surfaceTime * 0.12) - 0.5) * 2;
+    mark.x += (current + wind.value * 22) * seconds;
+    mark.x = wrapPoolX(mark.x, 75);
+  }
+
+  for (let leaf of floatingLeaves) {
+    // A slow current remains even when wind.value is zero.
+    let current = 2 + (noise(leaf.offset, surfaceTime * 0.14) - 0.5) * 3;
+    let targetX = current + wind.value * 28 * leaf.mobility;
+    let targetY = (noise(leaf.offset + 50, surfaceTime * 0.16) - 0.5) * 5;
+
+    // Gently steer away from the top and bottom of the pool.
+    const top = picY(WATER_TOP) + 18;
+    const bottom = picY(1) - 18;
+    targetY += max(0, top + 12 - leaf.y) * 0.5;
+    targetY -= max(0, leaf.y - bottom + 12) * 0.5;
+
+    let follow = 1 - exp(-3.5 * seconds);
+    leaf.vx = lerp(leaf.vx, targetX, follow);
+    leaf.vy = lerp(leaf.vy, targetY, follow);
+    leaf.x = wrapPoolX(leaf.x + leaf.vx * seconds, 24);
+    leaf.y = constrain(leaf.y + leaf.vy * seconds, top, bottom);
+  }
+}
+
+// Recycling happens fully outside the painted area, hidden by the pool mask.
+function wrapPoolX(x, margin) {
+  if (x > PIC_W + margin) return -margin;
+  if (x < -margin) return PIC_W + margin;
+  return x;
 }
 
 // ---------------------------------------------------------------- the palms
@@ -49,7 +179,7 @@ function drawPalms() {
     stroke(lightColours.trunk);
     strokeWeight(PALMS[p].trunkWidth);
     for (let i = 0; i < pieces; i++) {
-      rotate(PALMS[p].bow / pieces + wind.value * 0.008);
+      rotate(PALMS[p].bow / pieces + palmWind[p] * 0.014);
       line(0, 0, 0, -pieceLength);
       translate(0, -pieceLength);
     }
@@ -60,7 +190,7 @@ function drawPalms() {
     ellipse(0, 0, 6, 7);
 
     for (let f = 0; f < FRONDS_PER_PALM; f++) {
-      drawFrond(f);
+      drawFrond(p, f);
     }
     pop();
   }
@@ -68,8 +198,9 @@ function drawPalms() {
 
 // A frond is built like the trunk: 6 short pieces, each one turning a little towards the
 // ground. At the start of every piece we add two tiny leaves, one on each side.
-// Every frond is identical except for its angle: the Perlin / random member makes them differ.
-function drawFrond(f) {
+// The stored traits change the shape without generating new random values each frame.
+function drawFrond(p, f) {
+  let traits = frondTraits[p][f];
   // fronds fan out from straight left, over the top, to straight right
   let baseAngle = -PI + (f + 0.5) * PI / FRONDS_PER_PALM;
 
@@ -79,20 +210,19 @@ function drawFrond(f) {
     droop = -1;
   }
 
-  let length = PIC_W * 0.058;
+  let length = PIC_W * 0.058 * traits.lengthScale;
   let pieceLength = length / SEGMENTS;
-  let curl = droop * 0.2;
+  let flutter = (noise(traits.noiseOffset, windNoisePosition * 3) - 0.5) * 1.1;
+  let curl = droop * (traits.curl + flutter * 0.055);
 
-  // every third frond is a lighter green (f % 3 is 0, 1 or 2)
-  let tone = (f % 3) / 2;
-  let colour = mixColour(lightColours.leafDark, lightColours.leafLight, tone * tone);
-
+  // Keep only a shade ratio, so Time's changing day/night palette still colours the leaves.
+  let colour = mixColour(lightColours.leafDark, lightColours.leafLight, traits.tone);
   push();
-  rotate(baseAngle + wind.value * 0.2);
+  rotate(baseAngle + palmWind[p] * 0.27 * traits.softness + flutter);
   stroke(colour);
 
   for (let j = 0; j < SEGMENTS; j++) {
-    strokeWeight(1.8);
+    strokeWeight(traits.width);
     line(0, 0, pieceLength, 0);                       // one piece of the spine
 
     // the two tiny leaves slant outwards, and get shorter towards the tip
@@ -109,8 +239,96 @@ function drawFrond(f) {
 
 // ---------------------------------------------------------------- the water
 
-function drawWaterTexture() {}
-function drawWaterLines() {}
+// p5 clip() keeps the strokes and leaves in the pool. push()/pop() restore
+// drawing state so Time's ripples, the splash and the board remain unaffected.
+function clipPoolSurface() {
+  clip(() => rect(picX(0), picY(WATER_TOP), PIC_W, PIC_H * (1 - WATER_TOP)));
+}
+
+function drawWaterTexture() {
+  push();
+  clipPoolSurface();
+  noFill();
+  let ink = lightColours.squiggle;
+  stroke(ink[0], ink[1], ink[2], 14);
+  strokeWeight(1.5);
+
+  // Broad, faint bands keep the original flat colour while suggesting water.
+  for (let row = 0; row < 20; row++) {
+    let y = picY(WATER_TOP) + row * 14;
+    beginShape();
+    for (let x = 0; x <= PIC_W + 20; x += 20) {
+      let wave = noise((x - waterTravel) * 0.012, row * 0.28, surfaceTime * 0.08);
+      vertex(picX(0) + x, y + (wave - 0.5) * 10);
+    }
+    endShape();
+  }
+  pop();
+}
+
+function drawWaterLines() {
+  push();
+  clipPoolSurface();
+  noFill();
+  const ink = lightColours.squiggle;
+
+  for (let mark of waterMarks) {
+    let edgeFade = constrain(min(mark.x + mark.length, PIC_W - mark.x) / 28, 0, 1);
+    let shimmer = 0.65 + noise(mark.offset + 20, surfaceTime * 0.25) * 0.55;
+    let depth = map(mark.y, picY(WATER_TOP), picY(1), 0.65, 1.1);
+    strokeWeight(mark.weight * depth);
+
+    // Short tapered segments look like fine brush marks, not a rigid grid.
+    for (let j = 0; j < 10; j++) {
+      let along = j / 10;
+      let next = (j + 1) / 10;
+      let y1 = (noise(mark.offset + along * 0.8, surfaceTime * 0.2) - 0.5) * 4;
+      let y2 = (noise(mark.offset + next * 0.8, surfaceTime * 0.2) - 0.5) * 4;
+      let taper = sin((along + 0.05) * PI);
+      stroke(ink[0], ink[1], ink[2], mark.opacity * shimmer * edgeFade * taper);
+      line(picX(0) + mark.x + along * mark.length, mark.y + y1,
+           picX(0) + mark.x + next * mark.length, mark.y + y2);
+    }
+  }
+
+  for (let leaf of floatingLeaves) {
+    drawFloatingLeaf(leaf);
+  }
+  pop();
+}
+
+function drawFloatingLeaf(leaf) {
+  let alpha = 235 * constrain(min(leaf.x, PIC_W - leaf.x) / 18, 0, 1);
+  let bob = (noise(leaf.offset + 100, surfaceTime * 0.35) - 0.5) * 2.5;
+  let turn = (noise(leaf.offset + 150, surfaceTime * 0.2) - 0.5) * 0.8;
+  let shade = mixColour(lightColours.leafDark, lightColours.leafLight, leaf.shade);
+  shade = mixColour(shade, lightColours.boardTop, 0.22);
+
+  push();
+  translate(picX(0) + leaf.x, leaf.y + bob);
+
+  // A small contact ripple places the leaf on the surface.
+  noFill();
+  const reflection = lightColours.squiggle;
+  stroke(reflection[0], reflection[1], reflection[2], alpha * 0.18);
+  strokeWeight(0.7);
+  ellipse(-leaf.vx * 0.06, 1.5, leaf.length * 1.8, leaf.width * 1.2);
+
+  rotate(leaf.angle + turn + wind.value * 0.12);
+  noStroke();
+  fill(shade[0], shade[1], shade[2], alpha);
+  let l = leaf.length;
+  let w = leaf.width;
+  beginShape();
+  vertex(-l / 2, 0);
+  bezierVertex(-l * 0.15, -w, l * 0.3, -w * 0.65, l / 2, 0);
+  bezierVertex(l * 0.08, w * 0.85, -l * 0.35, w * 0.65, -l / 2, 0);
+  endShape(CLOSE);
+  stroke(lightColours.leafDark[0], lightColours.leafDark[1], lightColours.leafDark[2], alpha * 0.55);
+  strokeWeight(0.65);
+  line(-l * 0.38, 0, l * 0.35, 0);
+  pop();
+}
 
 // ---------------------------------------------------------------- the splash
 
