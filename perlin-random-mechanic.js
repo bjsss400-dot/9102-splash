@@ -1,6 +1,10 @@
 // perlin-random-mechanic.js
 // Owner: Aokun Liu (Okun) - Perlin noise and randomness.
+<<<<<<< Updated upstream
 // Iteration 1: a gentle natural breeze and stable, slightly different fronds.
+=======
+// Iteration 3: random batches fall, float briefly, then sink into the pool.
+>>>>>>> Stashed changes
 // Built on the group's existing palms and splash drawing.
 // References: https://p5js.org/reference/p5/noise/
 //             https://p5js.org/reference/p5/random/
@@ -14,8 +18,15 @@
 //     marks (solid white in the middle, feathery at the edges and the top) and a few droplets
 // This first iteration adds:
 //   - saved random length, curve, thickness, shade and softness for each frond
+<<<<<<< Updated upstream
 //   - one slow noise() breeze added to Input's wind.gust
 //   - a small independent flutter using each frond's own noise offset
+=======
+//   - a continuous noise() breeze, combined with Input's wind.gust
+//   - stronger independent flutter and slightly delayed palm movement
+//   - fine water lines and random batches of wind-driven falling leaves
+//   - each leaf floats for 1-2 seconds before gently sinking and disappearing
+>>>>>>> Stashed changes
 // Later iterations can add:
 //   - TODO: the splash: replace scatter() with random() + randomSeed(splash seed), so every splash is
 //           different but does not flicker, and use noise() so neighbouring strokes get similar heights
@@ -33,11 +44,38 @@ const SEGMENTS = 6;           // every frond is built from 6 short pieces
 const FROND_SEED = 9103;       // same seed = same leaf shapes after refreshing
 let frondTraits = [];         // one list of fronds for each palm
 let windNoisePosition = 0;
+<<<<<<< Updated upstream
+=======
+let palmWind = [0, 0];         // the two palms take a little time to follow the wind
+let surfaceTime = 0;
+let waterTravel = 0;
+let waterMarks = [];
+let poolLeaves = [];           // falling, floating and sinking leaves share one list
+let leafBatchNumber = 0;
+let previousLeafCount = 0;
+let nextLeafBatchAt = 0;
+let leafSerial = 0;
+
+const WATER_MARK_COUNT = 36;
+const LEAF_BATCH_COUNTS = [2, 3, 4, 5];
+>>>>>>> Stashed changes
 
 function setupVariation() {
   randomSeed(FROND_SEED);
   frondTraits = [];
   windNoisePosition = 0;
+<<<<<<< Updated upstream
+=======
+  palmWind = [0, 0];
+  surfaceTime = 0;
+  waterTravel = 0;
+  waterMarks = [];
+  poolLeaves = [];
+  leafBatchNumber = 0;
+  previousLeafCount = 0;
+  nextLeafBatchAt = 0;
+  leafSerial = 0;
+>>>>>>> Stashed changes
 
   for (let p = 0; p < PALMS.length; p++) {
     let palmFronds = [];
@@ -55,6 +93,57 @@ function setupVariation() {
     }
     frondTraits.push(palmFronds);
   }
+<<<<<<< Updated upstream
+=======
+
+  // A loose grid spreads the marks out; random values keep it from looking tiled.
+  // Store these once. The drawing functions never create fresh random shapes.
+  const waterHeight = PIC_H * (1 - WATER_TOP);
+  for (let i = 0; i < WATER_MARK_COUNT; i++) {
+    waterMarks.push({
+      x: (i % 6 + random(0.1, 0.9)) * PIC_W / 6,
+      y: picY(WATER_TOP) + (floor(i / 6) + random(0.15, 0.85)) * waterHeight / 6,
+      length: random(24, 64),
+      weight: random(0.7, 1.2),
+      opacity: random(60, 110),
+      offset: random(100, 1000)
+    });
+  }
+
+  spawnLeafBatch();
+}
+
+function spawnLeafBatch() {
+  // Pick a different count from the previous batch, then save each leaf's traits.
+  const counts = LEAF_BATCH_COUNTS.filter(count => count !== previousLeafCount);
+  const count = random(counts);
+  previousLeafCount = count;
+  leafBatchNumber++;
+
+  for (let i = 0; i < count; i++) {
+    poolLeaves.push({
+      id: ++leafSerial,
+      batch: leafBatchNumber,
+      state: 'falling',
+      age: -i * random(0.15, 0.4),
+      x: (i + random(0.3, 0.7)) * PIC_W / count,
+      y: picY(0) - random(14, 32),
+      // The upper part of the pool stays clear of the diving board.
+      landingY: picY(random(0.64, 0.77)),
+      fallSpeed: random(68, 90),
+      floatFor: random(1, 2),
+      sinkFor: random(0.9, 1.4),
+      length: random(12, 22),
+      width: random(3.5, 6.5),
+      angle: random(-PI, PI),
+      shade: random(0.25, 0.85),
+      mobility: random(0.85, 1.15),
+      offset: random(1200, 9000),
+      vx: 0,
+      vy: 0
+    });
+  }
+>>>>>>> Stashed changes
 }
 
 // wind.gust is written by input-controls.js; wind.value is written HERE.
@@ -64,9 +153,97 @@ function updateWind() {
   let seconds = min(deltaTime, 50) / 1000;
   windNoisePosition += seconds * 0.12;
 
+<<<<<<< Updated upstream
   // Nearby noise samples give a continuous breeze in the range -0.25 to 0.25.
   let breeze = (noise(windNoisePosition) - 0.5) * 0.5;
   wind.value = breeze + wind.gust;
+=======
+  // Slow changes give the main breeze; a second layer adds smaller gusts.
+  let breeze = (noise(200 + windNoisePosition) - 0.5) * 1.6;
+  breeze += (noise(800 + windNoisePosition * 2.3) - 0.5) * 0.5;
+
+  // A deliberate drag takes priority over the small natural breeze.
+  // Input still owns wind.gust. This file only reads it and writes wind.value.
+  let dragAmount = constrain(abs(wind.gust) / 0.35, 0, 1);
+  let targetWind = wind.gust + breeze * (1 - 0.85 * dragAmount);
+  targetWind = constrain(targetWind, -1.65, 1.65);
+  wind.value = lerp(wind.value, targetWind, 1 - exp(-8 * seconds));
+
+  for (let p = 0; p < PALMS.length; p++) {
+    palmWind[p] = lerp(palmWind[p], wind.value, 1 - exp(-(4 + p) * seconds));
+  }
+
+  // Update the surface once per frame, here. The water hooks only draw it.
+  updateWaterSurface(seconds);
+}
+
+function updateWaterSurface(seconds) {
+  waterTravel += (2 + wind.value * 20) * seconds;
+
+  for (let mark of waterMarks) {
+    let current = 1.8 + (noise(mark.offset, surfaceTime * 0.12) - 0.5) * 2;
+    mark.x += (current + wind.value * 22) * seconds;
+    mark.x = wrapPoolX(mark.x, 75);
+  }
+
+  for (let leaf of poolLeaves) {
+    leaf.age += seconds;
+    if (leaf.age < 0) continue;
+
+    if (leaf.state === 'falling') {
+      let sway = (noise(leaf.offset, surfaceTime * 0.45) - 0.5) * 24;
+      let edgePush = max(0, 35 - leaf.x) * 2 - max(0, leaf.x - PIC_W + 35) * 2;
+      let targetX = wind.value * 48 * leaf.mobility + sway + edgePush;
+      leaf.vx = lerp(leaf.vx, targetX, 1 - exp(-3 * seconds));
+      leaf.x = constrain(leaf.x + leaf.vx * seconds, 12, PIC_W - 12);
+      let fall = leaf.fallSpeed * (0.9 + noise(leaf.offset + 30, surfaceTime * 0.3) * 0.2);
+      leaf.y += fall * seconds;
+
+      if (leaf.y >= leaf.landingY) {
+        leaf.y = leaf.landingY;
+        leaf.state = 'floating';
+        leaf.age = 0;          // The 1-2 second hold starts at contact with the water.
+      }
+      continue;
+    }
+
+    // A slow current remains even when wind.value is zero.
+    let current = 2 + (noise(leaf.offset, surfaceTime * 0.14) - 0.5) * 3;
+    let targetX = current + wind.value * 28 * leaf.mobility;
+    let targetY = (noise(leaf.offset + 50, surfaceTime * 0.16) - 0.5) * 5;
+
+    // Gently steer away from the top and bottom of the pool.
+    const top = picY(WATER_TOP) + 18;
+    const bottom = picY(1) - 18;
+    targetY += max(0, top + 12 - leaf.y) * 0.5;
+    targetY -= max(0, leaf.y - bottom + 12) * 0.5;
+
+    let follow = 1 - exp(-3.5 * seconds);
+    leaf.vx = lerp(leaf.vx, targetX, follow);
+    leaf.vy = lerp(leaf.vy, targetY, follow);
+    leaf.x = constrain(leaf.x + leaf.vx * seconds, 12, PIC_W - 12);
+    leaf.y = constrain(leaf.y + leaf.vy * seconds, top, bottom);
+
+    if (leaf.state === 'floating' && leaf.age >= leaf.floatFor) {
+      leaf.state = 'sinking';
+      leaf.age = 0;
+    }
+  }
+
+  const hadLeaves = poolLeaves.length > 0;
+  poolLeaves = poolLeaves.filter(leaf => leaf.state !== 'sinking' || leaf.age < leaf.sinkFor);
+  if (hadLeaves && poolLeaves.length === 0) {
+    nextLeafBatchAt = surfaceTime + random(0.3, 0.8);
+  }
+  if (poolLeaves.length === 0 && surfaceTime >= nextLeafBatchAt) spawnLeafBatch();
+}
+
+// Recycling happens fully outside the painted area, hidden by the pool mask.
+function wrapPoolX(x, margin) {
+  if (x > PIC_W + margin) return -margin;
+  if (x < -margin) return PIC_W + margin;
+  return x;
+>>>>>>> Stashed changes
 }
 
 // ---------------------------------------------------------------- the palms
@@ -146,8 +323,135 @@ function drawFrond(p, f) {
 
 // ---------------------------------------------------------------- the water
 
+<<<<<<< Updated upstream
 function drawWaterTexture() {}
 function drawWaterLines() {}
+=======
+// p5 clip() keeps the strokes and leaves in the pool. push()/pop() restore
+// drawing state so Time's ripples, the splash and the board remain unaffected.
+function clipPoolSurface() {
+  clip(() => rect(picX(0), picY(WATER_TOP), PIC_W, PIC_H * (1 - WATER_TOP)));
+}
+
+function drawWaterTexture() {
+  push();
+  clipPoolSurface();
+  noFill();
+  let ink = lightColours.squiggle;
+  stroke(ink[0], ink[1], ink[2], 14);
+  strokeWeight(1.5);
+
+  // Broad, faint bands keep the original flat colour while suggesting water.
+  for (let row = 0; row < 20; row++) {
+    let y = picY(WATER_TOP) + row * 14;
+    beginShape();
+    for (let x = 0; x <= PIC_W + 20; x += 20) {
+      let wave = noise((x - waterTravel) * 0.012, row * 0.28, surfaceTime * 0.08);
+      vertex(picX(0) + x, y + (wave - 0.5) * 10);
+    }
+    endShape();
+  }
+  pop();
+}
+
+function drawWaterLines() {
+  push();
+  clipPoolSurface();
+  noFill();
+  const ink = lightColours.squiggle;
+
+  for (let mark of waterMarks) {
+    let edgeFade = constrain(min(mark.x + mark.length, PIC_W - mark.x) / 28, 0, 1);
+    let shimmer = 0.65 + noise(mark.offset + 20, surfaceTime * 0.25) * 0.55;
+    let depth = map(mark.y, picY(WATER_TOP), picY(1), 0.65, 1.1);
+    strokeWeight(mark.weight * depth);
+
+    // Short tapered segments look like fine brush marks, not a rigid grid.
+    for (let j = 0; j < 10; j++) {
+      let along = j / 10;
+      let next = (j + 1) / 10;
+      let y1 = (noise(mark.offset + along * 0.8, surfaceTime * 0.2) - 0.5) * 4;
+      let y2 = (noise(mark.offset + next * 0.8, surfaceTime * 0.2) - 0.5) * 4;
+      let taper = sin((along + 0.05) * PI);
+      stroke(ink[0], ink[1], ink[2], mark.opacity * shimmer * edgeFade * taper);
+      line(picX(0) + mark.x + along * mark.length, mark.y + y1,
+           picX(0) + mark.x + next * mark.length, mark.y + y2);
+    }
+  }
+
+  for (let leaf of poolLeaves) {
+    if (leaf.state !== 'falling') drawPoolLeaf(leaf);
+  }
+  pop();
+}
+
+function drawPoolLeaf(leaf) {
+  let sinking = leaf.state === 'sinking' ? constrain(leaf.age / leaf.sinkFor, 0, 1) : 0;
+  let alpha = 235 * constrain(min(leaf.x, PIC_W - leaf.x) / 18, 0, 1);
+  alpha *= (1 - sinking) * (1 - sinking);
+  let bob = (noise(leaf.offset + 100, surfaceTime * 0.35) - 0.5) * 2.5;
+  let turn = (noise(leaf.offset + 150, surfaceTime * 0.2) - 0.5) * 0.8;
+  let shade = mixColour(lightColours.leafDark, lightColours.leafLight, leaf.shade);
+  shade = mixColour(shade, lightColours.boardTop, 0.22);
+  shade = mixColour(shade, lightColours.waterTop, sinking * 0.8);
+
+  push();
+  translate(picX(0) + leaf.x, leaf.y + bob + sinking * 10);
+
+  // A small contact ripple places the leaf on the surface.
+  noFill();
+  const reflection = lightColours.squiggle;
+  stroke(reflection[0], reflection[1], reflection[2], alpha * 0.18);
+  strokeWeight(0.7);
+  ellipse(-leaf.vx * 0.06, 1.5, leaf.length * 1.8, leaf.width * 1.2);
+
+  // A small, short contact ring shows where the falling leaf met the water.
+  if (leaf.state === 'floating' && leaf.age < 0.6) {
+    let contact = leaf.age / 0.6;
+    stroke(reflection[0], reflection[1], reflection[2], 90 * (1 - contact));
+    ellipse(0, 1.5, leaf.length * (1 + contact * 2.5), 3 + contact * 6);
+  }
+
+  rotate(leaf.angle + turn + wind.value * 0.12);
+  scale(1 - sinking * 0.18, (1 - sinking * 0.18) * 0.68);
+  drawLeafShape(leaf, shade, alpha);
+  pop();
+}
+
+function drawFallingLeaves() {
+  push();
+  clip(() => rect(picX(0), picY(0), PIC_W, PIC_H));
+  for (let leaf of poolLeaves) {
+    if (leaf.state !== 'falling' || leaf.age < 0) continue;
+    let turn = (noise(leaf.offset + 150, surfaceTime * 0.4) - 0.5) * 1.6;
+    let shade = mixColour(lightColours.leafDark, lightColours.leafLight, leaf.shade);
+    shade = mixColour(shade, lightColours.boardTop, 0.3);
+    push();
+    translate(picX(0) + leaf.x, leaf.y);
+    rotate(leaf.angle + turn + wind.value * 0.2);
+    // Tipping as it falls changes the silhouette smoothly, without new randomness.
+    scale(1, 0.45 + noise(leaf.offset + 90, surfaceTime * 0.65) * 0.8);
+    drawLeafShape(leaf, shade, 240);
+    pop();
+  }
+  pop();
+}
+
+function drawLeafShape(leaf, shade, alpha) {
+  noStroke();
+  fill(shade[0], shade[1], shade[2], alpha);
+  let l = leaf.length;
+  let w = leaf.width;
+  beginShape();
+  vertex(-l / 2, 0);
+  bezierVertex(-l * 0.15, -w, l * 0.3, -w * 0.65, l / 2, 0);
+  bezierVertex(l * 0.08, w * 0.85, -l * 0.35, w * 0.65, -l / 2, 0);
+  endShape(CLOSE);
+  stroke(lightColours.leafDark[0], lightColours.leafDark[1], lightColours.leafDark[2], alpha * 0.55);
+  strokeWeight(0.65);
+  line(-l * 0.38, 0, l * 0.35, 0);
+}
+>>>>>>> Stashed changes
 
 // ---------------------------------------------------------------- the splash
 
@@ -159,6 +463,9 @@ function drawSplashes() {
       drawOneSplash(splashes[i]);
     }
   }
+  // This existing hook runs after the house and pool, so airborne leaves stay visible.
+  // The board and border are drawn afterwards by the shared scene file.
+  drawFallingLeaves();
 }
 
 // A repeatable "random" number between 0 and 1 for the number n. The same n always gives the
