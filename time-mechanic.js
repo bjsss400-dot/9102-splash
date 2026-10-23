@@ -1,8 +1,10 @@
 // TIME MECHANIC: an 80-second day, moving sky objects, and timed splash events.
-// Developed with assistance from OpenAI Codex (ChatGPT): palette interpolation,
-// sun/moon motion, star twinkling, splash timing, ripples, and these comments.
-// millis() counts milliseconds since the sketch started, so timing does not depend on frame rate.
-// Extra timing reference: https://p5js.org/reference/p5/millis/
+// AI ACKNOWLEDGEMENT - OpenAI ChatGPT (Codex)
+// This code was developed with the help of ChatGPT. AI assistance was used to
+// help generate and explain the day/night timing, colour transitions, sun/moon
+// movement, star twinkling, splash stages and expanding ripple animations.
+
+// Timing reference: https://p5js.org/reference/p5/millis/
 
 const DAY_LENGTH = 80000; // milliseconds per complete day/night cycle
 const START_PHASE = 0.02;
@@ -99,6 +101,10 @@ let timeStars = [];
 let timeSplashSeed = 0;
 
 // Set things to default when the sketch starts
+// AI assistance (ChatGPT): helped generate the initial timing and object setup.
+// The clock offset starts the day at START_PHASE. Six splash objects are prepared
+// for reuse, and 55 stars get fixed positions calculated from their loop index.
+// updateTimeMechanic() then sets the initial lighting before drawing begins.
 function setupTimeMechanic() {
   timeShift = millis() - START_PHASE * DAY_LENGTH;
   splashes = [];
@@ -129,6 +135,9 @@ function setupTimeMechanic() {
 }
 
 // Update the time, splashes and ripples in every frame
+// AI assistance (ChatGPT): helped generate the repeating clock and event updates.
+// The remainder operator (%) repeats the day every 80,000 milliseconds.
+// Each frame updates active splashes and removes ripples older than 2,200 ms.
 function updateTimeMechanic() {
   let now = millis();
   // % removes complete days; dividing by DAY_LENGTH gives progress from 0 to 1
@@ -155,6 +164,9 @@ function updateTimeMechanic() {
 }
 
 // To make the change start slowly, become faster, then slow down at the end
+// AI assistance (ChatGPT): helped generate this smooth transition calculation.
+// constrain() keeps the input between 0 and 1. The cosine formula returns a blend
+// value that changes slowly at both ends and faster around the middle.
 function easeTimeBlend(amount) {
   amount = constrain(amount, 0, 1);
   // cos goes from 1 to -1; (1 - cos) / 2 changes that range to 0 to 1
@@ -162,6 +174,9 @@ function easeTimeBlend(amount) {
 }
 
 // Change the colors of the scene according to the current time
+// AI assistance (ChatGPT): helped generate the palette transition logic.
+// The loop finds the two lighting stops around dayPhase. The eased progress
+// blends every named RGB colour and the nightAmount value between those stops.
 function updateTimeLighting() {
   for (let i = 0; i < TIME_LIGHT_STOPS.length - 1; i++) {
     let from = TIME_LIGHT_STOPS[i];
@@ -185,6 +200,9 @@ function updateTimeLighting() {
 }
 
 // Mix the red, green and blue values of two colors using the same amount
+// AI assistance (ChatGPT): helped generate this RGB blending helper.
+// lerp() blends each colour channel separately: amount 0 gives colourA,
+// amount 1 gives colourB, and values in between give intermediate colours.
 function mixColour(colourA, colourB, amount) {
   let red = lerp(colourA[0], colourB[0], amount);
   let green = lerp(colourA[1], colourB[1], amount);
@@ -193,6 +211,9 @@ function mixColour(colourA, colourB, amount) {
 }
 
 // Switch to the time selected by the keyboard controls
+// AI assistance (ChatGPT): helped generate the time-jump calculation.
+// Changing timeShift moves the day clock to the selected phase. Splash and
+// ripple start times stay unchanged, so their animations continue normally.
 function jumpToTimeOfDay(index) {
   // Only accept the four time choices, numbered from 0 to 3
   if (index !== 0 && index !== 1 && index !== 2 && index !== 3) {
@@ -205,6 +226,9 @@ function jumpToTimeOfDay(index) {
 }
 
 // To show the current time period's name at the top of the picture
+// AI assistance (ChatGPT): helped turn the numeric day phase into a text label.
+// These conditions divide the cycle into day, sunset, night and sunrise labels.
+// This function only returns a label; updateTimeLighting() controls the colours.
 function getTimeOfDayName() {
   if (dayPhase < 0.125 || dayPhase >= 0.875) {
     return 'day';
@@ -218,6 +242,9 @@ function getTimeOfDayName() {
 }
 
 // Draw the sky objects before the house so the house can cover them
+// AI assistance (ChatGPT): helped generate star twinkling and sky-object timing.
+// sin() changes each star's brightness over time, while nightAmount controls
+// visibility. Offset day phases give the sun and moon separate half-day paths.
 function drawSkyObjects() {
   push();
   noStroke();
@@ -247,6 +274,10 @@ function drawSkyObjects() {
 }
 
 // Use the same movement for the sun and moon, but different sizes and colors
+// AI assistance (ChatGPT): helped generate the shared sun/moon animation.
+// lerp() moves the object horizontally. sin() and Math.pow() shape its curved
+// vertical path. Its colour, size and transparency change along the journey,
+// and overlapping transparent circles create the glow.
 function drawTimeOrb(progress, isMoon) {
   // sin rises from 0 to 1, then falls to 0 as progress moves from 0 to 1
   let elevation = sin(progress * PI);
@@ -291,6 +322,10 @@ function drawTimeOrb(progress, isMoon) {
 }
 
 // Start a splash when the input or audio code calls this function
+// AI assistance (ChatGPT): helped generate the splash start and reuse logic.
+// A call from the input or audio code selects a free splash object, or reuses
+// the oldest one. It records the start time, resets the animation values and
+// creates the first ripple. This function does not detect input or sound itself.
 function triggerSplash(x, power, y) {
   // x and y use 0 to 1 across the picture; use defaults for missing arguments
   if (power == undefined) {
@@ -337,6 +372,11 @@ function triggerSplash(x, power, y) {
 }
 
 // Determine which stage the splash is in by checking how long it has lasted
+// AI assistance (ChatGPT): helped generate the four timed splash stages.
+// Elapsed time selects rising (480 ms), peak (180 ms), falling (620 ms), then
+// fading (600 ms). Each stage sets height and transparency for the drawing code.
+// A second ripple starts at the end of falling, and the object becomes inactive
+// after fading so it can be reused for another splash.
 function updateTimedSplash(splash, now) {
   let age = now - splash.startedAt;
   // Calculate when each stage should finish
@@ -387,6 +427,9 @@ function updateTimedSplash(splash, now) {
 }
 
 // Store a new ripple at the same position as the splash
+// AI assistance (ChatGPT): helped generate ripple storage and the count limit.
+// Each ripple stores its position, power, start time and strength. If the list
+// exceeds 36 entries, a loop keeps the newest 36 to limit the number stored.
 function addTimeRipple(splash, startedAt, strength) {
   timeRipples.push({
     x: splash.x, y: splash.y, power: splash.power, startedAt: startedAt, strength: strength
@@ -403,6 +446,10 @@ function addTimeRipple(splash, startedAt, strength) {
 }
 
 // Draw ripples that spread across the water and slowly disappear
+// AI assistance (ChatGPT): helped generate the timed ripple drawing.
+// Elapsed time is converted to progress from 0 to 1 over 2,200 ms. This progress
+// increases the radius and reduces transparency. A flattened ellipse suggests
+// water perspective, and a radius limit keeps it within the water vertically.
 function drawRipples() {
   push();
   noFill();
