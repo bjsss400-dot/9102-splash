@@ -2,6 +2,10 @@ body {
   margin: 0;
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 16px;
+  box-sizing: border-box;
   align-items: center;
   justify-content: center;
   background: #2c3a40;   /* dark slate, so the cream border of the painting reads clearly */
@@ -10,3 +14,28 @@ body {
 canvas {
   display: block;
 }
+
+.audio-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 660px;
+  max-width: 100%;
+  color: #e4dac9;
+  font: 14px/1.5 system-ui, sans-serif;
+}
+
+.audio-controls p {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+}
+
+.audio-controls button {
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
