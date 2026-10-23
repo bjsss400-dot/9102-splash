@@ -51,6 +51,7 @@ function drawScene() {
   drawChair();
   drawPool();
   drawRipples();        // time-mechanic.js
+  drawTouchRipples();   // input-controls.js: rings that follow the mouse over the water
   drawSplashes();       // perlin-random-mechanic.js
   drawDivingBoard();
   drawBorder();
@@ -327,3 +328,4 @@ function drawBorder() {
   rect(0, 0, BORDER, height);
   rect(width - BORDER, 0, BORDER, height);
 }
+
