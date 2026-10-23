@@ -1,17 +1,3 @@
-// sketch.js
-// The main file. It only brings the other scripts together (Week 6: setup and draw).
-// Owner: Audio member (the order things run in, the text in the border, final testing).
-//
-//   artwork-base.js            the flat scene from "A Bigger Splash"            (User input)
-//   time-mechanic.js           TIME      – day / night colours, splash life     (Time)
-//   perlin-random-mechanic.js  PERLIN / RANDOM – variation, wind, palms, water  (Perlin / random)
-//   input-controls.js          INPUT     – click for splash, drag for wind      (User input)
-//   audio-mechanic.js          AUDIO     – loudness triggers splashes           (Audio)
-
-// The wind is shared by two files, and each writes only its own part:
-//   gust  = a push from the mouse            (written by input-controls.js)
-//   value = smooth wind + gust, every frame  (written by perlin-random-mechanic.js)
-// Negative = blowing left, positive = blowing right.
 let wind = {
   gust: 0,
   value: 0
