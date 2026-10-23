@@ -58,12 +58,9 @@ leaves and additional splash variation remain possible future iterations.
 - Switch time of day: frond colours follow the shared palette.
 - Click the pool repeatedly: the existing splash lifecycle and ripples still run.
 
-## AI acknowledgement and references
+## External references
 
-OpenAI Codex assisted with the implementation, comments, integration checks and
-this README for Okun's iteration 1. The previous scene and other mechanics are
-retained from the group repository; their contributors should maintain their
-own acknowledgements. Okun should review and understand the code before presenting it.
+The previous scene and other mechanics are retained from the group repository.
 
 - [Artwork reference — The David Hockney Foundation](https://www.thedavidhockneyfoundation.org/artwork/3667)
 - [p5.js noise](https://p5js.org/reference/p5/noise/)

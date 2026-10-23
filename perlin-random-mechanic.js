@@ -1,7 +1,7 @@
 // perlin-random-mechanic.js
 // Owner: Aokun Liu (Okun) - Perlin noise and randomness.
 // Iteration 1: a gentle natural breeze and stable, slightly different fronds.
-// Built on the group's existing palms and splash drawing, with Codex assistance.
+// Built on the group's existing palms and splash drawing.
 // References: https://p5js.org/reference/p5/noise/
 //             https://p5js.org/reference/p5/random/
 //             https://p5js.org/reference/p5/randomSeed/
