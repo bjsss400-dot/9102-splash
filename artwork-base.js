@@ -3,6 +3,12 @@
 // laid out like the original painting.
 // (Owner: User input member. This file only draws the flat blocks; it never decides colours.)
 //
+// AI acknowledgement: the drawing code in this file was written with the help of Claude (Anthropic). The shapes,
+// positions and colours come from measurements of Hockney's painting and of the reference images our team
+// collected (see the README). Claude was used for the layout in fractions of the picture (picX and picY), the
+// reflections in the glass (skyline, palms, bush, curtains), the director's chair and the bending diving board.
+// Each part is explained in the comments next to it.
+//
 // What we noticed in the original:
 //  - an almost square picture on a beige canvas, with an unpainted border
 //  - everything is flat colour with sharp edges: sky, a low house, a wide pink deck, a pool
@@ -51,8 +57,10 @@ function drawScene() {
   drawChair();
   drawPool();
   drawRipples();        // time-mechanic.js
+  drawTouchRipples();   // input-controls.js: rings that follow the mouse over the water
   drawSplashes();       // perlin-random-mechanic.js
   drawDivingBoard();
+  drawDiveArc();        // input-controls.js: the path of the unseen diver
   drawBorder();
 }
 
@@ -192,6 +200,9 @@ function drawCurtain(left, right) {
 // One palm seen in the glass: a thin dark trunk and a small crown of drooping fronds.
 // A frond is a few short pieces, each turning a little towards the ground, with two tiny leaves
 // on each piece. The palm leans a little with the wind.
+// The crown is drawn once at a standard size and then made bigger or smaller with scale() (Week 10):
+// scale() stretches everything drawn after it, including the thickness of the lines, so we do not
+// have to multiply every number by "size" ourselves.
 function drawReflectedPalm(x, crownY, trunkLength, size) {
   let ink = 95 * (1 - nightAmount * 0.5);    // dark grey by day, fainter at night
 
@@ -201,7 +212,9 @@ function drawReflectedPalm(x, crownY, trunkLength, size) {
 
   stroke(0, 0, 0, ink);
   strokeWeight(2 * size);
-  line(0, 0, 0, PIC_H * trunkLength);          // the trunk
+  line(0, 0, 0, PIC_H * trunkLength);          // the trunk (its length is given separately, so it is drawn before scale)
+
+  scale(size);                                 // from here on, the crown is size times bigger (or smaller)
 
   for (let f = 0; f < 8; f++) {
     let angle = -PI + (f + 0.5) * PI / 8;      // from left, over the top, to the right
@@ -212,11 +225,11 @@ function drawReflectedPalm(x, crownY, trunkLength, size) {
 
     push();
     rotate(angle);
-    strokeWeight(1.3 * size);
+    strokeWeight(1.3);
     for (let j = 0; j < 6; j++) {
       // the pieces get shorter and the two tiny leaves smaller towards the tip
-      let pieceLength = (4.6 - j * 0.35) * size;
-      let leafLength = (3 - j * 0.35) * size;
+      let pieceLength = 4.6 - j * 0.35;
+      let leafLength = 3 - j * 0.35;
       line(0, 0, pieceLength, 0);
       line(0, 0, leafLength * 0.7, leafLength * 0.8);
       line(0, 0, leafLength * 0.7, -leafLength * 0.8);
@@ -274,11 +287,16 @@ function drawChair() {
   line(picX(0.204), picY(0.472), picX(0.243), picY(0.438));
   line(picX(0.249), picY(0.470), picX(0.211), picY(0.438));
 
-  // the white canvas: the back and the seat
+  // the white canvas: the back and the seat. rectMode(CENTER) means "the x and y I give are the CENTRE of the
+  // rectangle", so we say where the middle of each piece of canvas is. push() and pop() (Week 10) put
+  // rectMode back to normal afterwards, so the rest of the scene is not affected.
+  push();
+  rectMode(CENTER);
   noStroke();
   fill(mixColour(lightColours.frame, [255, 255, 255], 0.55));
-  rect(picX(0.202), picY(0.410), PIC_W * 0.050, PIC_H * 0.017);
-  rect(picX(0.210), picY(0.437), PIC_W * 0.040, PIC_H * 0.009);
+  rect(picX(0.227), picY(0.4185), PIC_W * 0.050, PIC_H * 0.017);    // the back
+  rect(picX(0.230), picY(0.4415), PIC_W * 0.040, PIC_H * 0.009);    // the seat
+  pop();
 }
 
 function drawPool() {
@@ -303,18 +321,66 @@ function drawPool() {
 function drawDivingBoard() {
   noStroke();
 
-  // the top of the board
-  // (two shapes that overlap a little, so no thin seam shows between them)
-  fill(lightColours.boardTop);
-  quad(picX(0.575), picY(0.798), picX(0.795), picY(0.797),
-       picX(1.0), picY(1.01), picX(0.828), picY(1.01));
-  quad(picX(0.795), picY(0.797), picX(1.0), picY(0.894),
-       picX(1.0), picY(1.01), picX(0.90), picY(0.95));
+  // The board is a strip. Its two long edges, written as (x, y) fractions of the picture,
+  // run from the tip (t = 0) to the picture's edge (t = 1). The right edge ends beyond the picture, hidden by the border.
+  const tipLeftX = 0.575;
+  const tipLeftY = 0.798;
+  const tipRightX = 0.795;
+  const tipRightY = 0.797;
+  const nearLeftX = 0.828;       // where the left edge reaches the bottom of the picture
+  const nearRightX = 1.245;      // where the right edge would reach it
+  const bottomY = 1.01;
+  const thick = 0.014;           // how thick the board is: its side is visible, so we can see it floats above the water
 
-  // the darker edge along the near side of the board
+  // 1) Work out the edges of the board at 15 places along its length (14 slices between them).
+  //    Each place is moved down by a different amount: nothing at the picture's edge (t = 1, where the board
+  //    is held) and the most at the tip (t = 0). (1 - t) * (1 - t) makes the board curve smoothly, like a real
+  //    board bending under a person. board.bend (from input-controls.js) is 0 when flat and 1 when fully bent.
+  const slices = 14;
+  let dropAtTip = board.bend * BOARD_DROP;
+  let edges = [];
+  for (let k = 0; k <= slices; k++) {
+    let t = k / slices;
+    let down = dropAtTip * (1 - t) * (1 - t);
+    edges.push({
+      leftX: lerp(tipLeftX, nearLeftX, t),
+      leftY: lerp(tipLeftY, bottomY, t) + down,
+      rightX: lerp(tipRightX, nearRightX, t),
+      rightY: lerp(tipRightY, bottomY, t) + down
+    });
+  }
+
+  // 2) The shadow on the water: the same shape, a little to the left of and below the board. The more the board
+  //    bends, the closer to the water it comes, so the gap between the board and its shadow gets smaller
+  //    (but never closes: the board always stays clearly above the water).
+  let gap = 0.040 - board.bend * 0.026;
+  if (gap < 0.014) {
+    gap = 0.014;
+  }
+  fill(mixColour(lightColours.waterTop, [0, 0, 0], 0.16));   // a solid darker water colour: overlapping slices leave no lines
+  for (let k = 0; k < slices; k++) {
+    quad(picX(edges[k].leftX - 0.010), picY(edges[k].leftY + gap), picX(edges[k].rightX - 0.010), picY(edges[k].rightY + gap),
+         picX(edges[k + 1].rightX - 0.010), picY(edges[k + 1].rightY + gap + 0.002), picX(edges[k + 1].leftX - 0.010), picY(edges[k + 1].leftY + gap + 0.002));
+  }
+
+  // 3) The side of the board along its left edge: you can see the board has a thickness
   fill(lightColours.boardSide);
-  quad(picX(0.575), picY(0.798), picX(0.586), picY(0.822),
-       picX(0.846), picY(1.01), picX(0.828), picY(1.01));
+  for (let k = 0; k < slices; k++) {
+    quad(picX(edges[k].leftX), picY(edges[k].leftY), picX(edges[k + 1].leftX), picY(edges[k + 1].leftY),
+         picX(edges[k + 1].leftX), picY(edges[k + 1].leftY + thick), picX(edges[k].leftX), picY(edges[k].leftY + thick));
+  }
+
+  // 4) The top of the board (the slices overlap a hair, so no thin seams show)
+  fill(lightColours.boardTop);
+  for (let k = 0; k < slices; k++) {
+    quad(picX(edges[k].leftX), picY(edges[k].leftY), picX(edges[k].rightX), picY(edges[k].rightY),
+         picX(edges[k + 1].rightX + 0.002), picY(edges[k + 1].rightY + 0.002), picX(edges[k + 1].leftX), picY(edges[k + 1].leftY + 0.002));
+  }
+
+  // 5) The end of the board: a thin darker face at the tip
+  fill(lightColours.boardSide);
+  quad(picX(edges[0].leftX), picY(edges[0].leftY), picX(edges[0].rightX), picY(edges[0].rightY),
+       picX(edges[0].rightX), picY(edges[0].rightY + thick), picX(edges[0].leftX), picY(edges[0].leftY + thick));
 }
 
 // Four beige rectangles hide anything that spills outside the picture
