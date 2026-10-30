@@ -385,11 +385,25 @@ let edges = [];
   }
 
   // 4) The top of the board (the slices overlap a hair, so no thin seams show)
-  fill(lightColours.boardTop);
-  for (let k = 0; k < slices; k++) {
-    quad(picX(edges[k].leftX), picY(edges[k].leftY), picX(edges[k].rightX), picY(edges[k].rightY),
-         picX(edges[k + 1].rightX + 0.002), picY(edges[k + 1].rightY + 0.002), picX(edges[k + 1].leftX), picY(edges[k + 1].leftY + 0.002));
-  }
+  
+fill(lightColours.boardTop);
+
+for (let k = 0; k < slices; k++) {
+  quad(
+    picX(edges[k].leftX),
+    picY(edges[k].leftY),
+
+    picX(edges[k].rightX),
+    picY(edges[k].rightY),
+
+    picX(edges[k + 1].rightX),
+    picY(edges[k + 1].rightY),
+
+    picX(edges[k + 1].leftX),
+    picY(edges[k + 1].leftY)
+  );
+}
+
 
   // 5) The end of the board: a thin darker face at the tip
   fill(lightColours.boardSide);
