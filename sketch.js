@@ -36,9 +36,13 @@ function drawBorderText() {
   text(getTimeOfDayName(), BORDER, BORDER / 2);
 
   textAlign(CENTER, CENTER);
-  let message = 'click the pool: splash   drag left / right: wind   1 2 3 4: time of day   M: music';
-  if (audioState.started === false) {
-    message = 'click anywhere to start the music';
+  let message = 'hold board / SPACE: dive   click pool: splash   drag: wind   1 2 3 4: time   M: music';
+  if (diver.state === 'charging') {
+    let seconds = (diver.charge * CHARGE_DURATION_MS / 1000).toFixed(1);
+    message = 'Hold: ' + seconds + ' s   |   short: near + small   |   long: far + big   |   release to dive';
+  } else if (audioState.started === false) {
+    message = 'hold board or SPACE, then release   |   short: near + small   |   long: far + big';
   }
   text(message, width / 2, height - BORDER / 2);
 }
+
