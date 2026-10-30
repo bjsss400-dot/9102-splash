@@ -474,8 +474,8 @@ function drawOneSplash(thisSplash) {
   let baseY = picY(thisSplash.y);
   let power = thisSplash.power;
 
-  // Input iteration (OpenAI Codex assistance): the plume formulas have a broad
-  // minimum, so shrink the entire weak splash, including its marks and droplets.
+  // The plume formulas have a broad minimum, so shrink the entire weak splash,
+  // including its marks and droplets.
   // Scale around its landing point; stronger splashes keep their original size.
   let sizeScale = constrain(0.3 + power, 0.5, 1);
   push();

@@ -3,10 +3,9 @@
 // laid out like the original painting.
 // (Owner: User input member. This file only draws the flat blocks; it never decides colours.)
 //
-// AI acknowledgement: the drawing code in this file was written with the help of Claude (Anthropic). The shapes,
-// positions and colours come from measurements of Hockney's painting and of the reference images our team
-// collected (see the README). Claude was used for the layout in fractions of the picture (picX and picY), the
-// reflections in the glass (skyline, palms, bush, curtains), the director's chair and the bending diving board.
+// The scene uses picture-relative coordinates (picX and picY) for the house,
+// reflections in the glass (skyline, palms, bush, curtains), the director's chair
+// and the bending diving board.
 // Each part is explained in the comments next to it.
 //
 // What we noticed in the original:

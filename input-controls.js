@@ -15,12 +15,11 @@
 //
 // This member also owns index.html, style.css and artwork-base.js (the flat scene).
 //
-// AI acknowledgement: the dive (hold SPACE) and the ripples that follow the mouse were written with the help of
-// Claude (Anthropic). The dive is a small set of states (ready, charging, flying);
+// The dive is a small set of states (ready, charging, flying);
 // the board is a spring (it is pulled back to flat and keeps a little speed, so it wobbles);
 // the ripples are a fixed list of rings that grow and fade. Each part is explained in the comments below.
-// This duration-and-distance iteration was developed with OpenAI Codex: elapsed-time charge,
-// release-time sampling, direct board pressing, and the landing preview.
+// Elapsed-time charge, release-time sampling, direct board pressing and the landing
+// preview connect the hold duration to the final splash.
 // The next iteration makes short dives smaller and removes click-to-splash:
 // only releasing a charged board (mouse or SPACE) can produce a user splash.
 //

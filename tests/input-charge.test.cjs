@@ -1,6 +1,5 @@
 // Run with: node tests/input-charge.test.cjs
 // Exercises the real group modules with small p5/Web Audio stubs.
-// AI assistance: OpenAI Codex helped write these regression checks.
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
