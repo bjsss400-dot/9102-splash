@@ -1,7 +1,7 @@
 // artwork-base.js
 // THE STATIC SCENE – our reinterpretation of David Hockney's "A Bigger Splash" (1967),
 // laid out like the original painting.
-// (Owner: User input member. Scene geometry uses the shared time-of-day palette.)
+// (Owner: User input member. This file only draws the flat blocks; it never decides colours.)
 //
 // The scene uses picture-relative coordinates (picX and picY) for the house,
 // reflections in the glass (skyline, palms, bush, curtains), the director's chair
@@ -307,123 +307,12 @@ function drawPool() {
   fill(lightColours.poolEdge);
   rect(picX(0), picY(DECK_BOTTOM + 0.007), PIC_W, PIC_H * (WATER_TOP - DECK_BOTTOM - 0.007));
 
-  // The deeper floor loses light towards the foreground. The colours still
-  // come from the time mechanic, so the whole basin follows day and night.
-  const strips = 32;
-  let shallow = mixColour(lightColours.waterTop, lightColours.squiggle, 0.10);
-  let deep = mixColour(lightColours.waterBottom, lightColours.poolEdge, 0.38);
-  for (let i = 0; i < strips; i++) {
-    let t = i / (strips - 1);
-    fill(mixColour(shallow, deep, t));
-    rect(picX(0), picY(WATER_TOP + (1 - WATER_TOP) * i / strips),
-         PIC_W, PIC_H * (1 - WATER_TOP) / strips + 1);
-  }
-
-  drawPoolBasin();
-  drawPoolFloorLight();
+  // the flat water colour (the Perlin member's texture is painted over it)
+  fill(lightColours.waterTop);
+  rect(picX(0), picY(WATER_TOP), PIC_W, PIC_H * (1 - WATER_TOP));
 
   drawWaterTexture();   // perlin-random-mechanic.js (2D Perlin noise)
   drawWaterLines();     // perlin-random-mechanic.js (light squiggles)
-}
-
-// Three submerged walls surround a trapezoid of floor. Their lower corners
-// are inset from the water's edge, making the pool read as a hollow volume.
-function drawPoolBasin() {
-  push();
-  noStroke();
-
-  let wallTop = mixColour(lightColours.waterTop, lightColours.squiggle, 0.40);
-  let wallBottom = mixColour(lightColours.waterBottom, lightColours.poolEdge, 0.60);
-  const strips = 18;
-  for (let i = 0; i < strips; i++) {
-    let a = i / strips;
-    let b = (i + 1) / strips;
-    fill(mixColour(wallTop, wallBottom, a));
-    quad(picX(0.11 * a), picY(lerp(WATER_TOP, 0.69, a)),
-         picX(1 - 0.07 * a), picY(lerp(WATER_TOP, 0.69, a)),
-         picX(1 - 0.07 * b), picY(lerp(WATER_TOP, 0.69, b)),
-         picX(0.11 * b), picY(lerp(WATER_TOP, 0.69, b)));
-  }
-
-  // A cooler left wall and a lighter right wall distinguish the three planes.
-  fill(mixColour(lightColours.waterBottom, lightColours.poolEdge, 0.78));
-  quad(picX(0), picY(WATER_TOP), picX(0.11), picY(0.69),
-       picX(0.22), picY(1), picX(0), picY(1));
-  fill(mixColour(lightColours.waterTop, lightColours.poolEdge, 0.38));
-  quad(picX(1), picY(WATER_TOP), picX(1), picY(1),
-       picX(0.86), picY(1), picX(0.93), picY(0.69));
-
-  // The wall casts a broad translucent shadow onto the floor.
-  let shade = lightColours.poolEdge;
-  fill(shade[0], shade[1], shade[2], 80);
-  quad(picX(0.11), picY(0.69), picX(0.20), picY(0.69),
-       picX(0.40), picY(1), picX(0.22), picY(1));
-
-  // A softened seam at the floor and a thin highlight at the waterline.
-  noFill();
-  stroke(shade[0], shade[1], shade[2], 100);
-  strokeWeight(1.1);
-  beginShape();
-  vertex(picX(0.22), picY(1));
-  vertex(picX(0.11), picY(0.69));
-  vertex(picX(0.93), picY(0.69));
-  vertex(picX(0.86), picY(1));
-  endShape();
-  let light = lightColours.squiggle;
-  stroke(light[0], light[1], light[2], 135);
-  strokeWeight(1.6);
-  line(picX(0), picY(WATER_TOP + 0.002), picX(1), picY(WATER_TOP + 0.002));
-  pop();
-}
-
-// Fixed, broken curves suggest light refracted onto the pool floor. Their
-// spacing grows towards the viewer; the moving surface texture is drawn above.
-function drawPoolFloorLight() {
-  push();
-  noStroke();
-  fill(255);
-  clip(() => quad(picX(0.11), picY(0.69), picX(0.93), picY(0.69),
-                 picX(0.86), picY(1), picX(0.22), picY(1)));
-  noFill();
-
-  const columns = 10;
-  const rows = 7;
-  let light = lightColours.squiggle;
-  for (let row = 0; row <= rows; row++) {
-    for (let column = 0; column <= columns; column++) {
-      let point = poolFloorLightPoint(column, row, columns, rows);
-      let strength = (24 + 22 * row / rows) * (1 - nightAmount * 0.65);
-      stroke(light[0], light[1], light[2], strength);
-      strokeWeight(0.7 + row / rows * 0.7);
-      // Gaps and uneven curves keep the light from looking like a tile grid.
-      if (column < columns && (column + row * 3) % 5 !== 0) {
-        drawPoolLightCurve(point, poolFloorLightPoint(column + 1, row, columns, rows), column + row * 11);
-      }
-      if (row < rows && (column * 3 + row) % 4 !== 0) {
-        drawPoolLightCurve(point, poolFloorLightPoint(column, row + 1, columns, rows), column * 7 + row);
-      }
-    }
-  }
-  pop();
-}
-
-function poolFloorLightPoint(column, row, columns, rows) {
-  let t = row / rows;
-  let depth = t * (0.65 + 0.35 * t);
-  let across = (column + sin(column * 2.7 + row * 4.1) * 0.30) / columns;
-  return {
-    x: picX(lerp(lerp(0.11, 0.22, depth), lerp(0.93, 0.86, depth), across)),
-    y: picY(0.69 + depth * 0.31 + sin(column * 3.8 + row * 1.9) * 0.008)
-  };
-}
-
-function drawPoolLightCurve(a, b, seed) {
-  let bend = sin(seed * 2.31) * 5;
-  beginShape();
-  vertex(a.x, a.y);
-  bezierVertex(lerp(a.x, b.x, 0.32) + bend, lerp(a.y, b.y, 0.32) - bend,
-               lerp(a.x, b.x, 0.68) - bend, lerp(a.y, b.y, 0.68) + bend, b.x, b.y);
-  endShape();
 }
 
 // The diving board comes in from the bottom right corner and ends in front of the splash.
