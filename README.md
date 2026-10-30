@@ -23,5 +23,6 @@ OpenAI Codex assisted with:
 - The small-splash scaling adjustment in `drawOneSplash()` in `perlin-random-mechanic.js`. This acknowledgement covers that input-related adjustment; it does not describe the other member's Perlin noise and randomness work.
 - The regression checks in `tests/input-charge.test.cjs` for hold timing, input handling, splash size and integration with the group modules.
 - Moving these source-comment acknowledgements into this README.
+- Adding submerged pool walls, a shaded floor and perspective-scaled refracted-light curves to `artwork-base.js`, using the supplied pool reference image and the group's existing day/night palette.
 
 This section records assistance for the user input contribution and its shared artwork. Other members' existing acknowledgements remain with their contributions.
