@@ -336,9 +336,23 @@ function drawDivingBoard() {
   //    Each place is moved down by a different amount: nothing at the picture's edge (t = 1, where the board
   //    is held) and the most at the tip (t = 0). (1 - t) * (1 - t) makes the board curve smoothly, like a real
   //    board bending under a person. board.bend (from input-controls.js) is 0 when flat and 1 when fully bent.
-  const slices = 14;
-  let dropAtTip = board.bend * BOARD_DROP;
-  let edges = [];
+  
+const slices = 24;
+
+// Keep the visual bending within a safe geometric range.
+// This prevents the board tip from folding back
+// over the rest of the board at high audio amplitude.
+const maxTipDrop = 0.09;
+const minTipDrop = -0.06;
+
+let dropAtTip = constrain(
+  board.bend * BOARD_DROP,
+  minTipDrop,
+  maxTipDrop
+);
+
+let edges = [];
+
   for (let k = 0; k <= slices; k++) {
     let t = k / slices;
     let down = dropAtTip * (1 - t) * (1 - t);
