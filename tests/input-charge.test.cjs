@@ -121,7 +121,7 @@ async function main() {
   keys.hold(300, 60); keys.release();
   assert.ok(Math.abs(keys.snapshot().charge - 0.4) < 1e-9);
 
-  // Direct board pressing takes priority over pool clicks and mouse-drag wind.
+  // Direct board pressing charges a dive and suppresses mouse-drag wind.
   const mouse = makeApp();
   mouse.s.mouseX = mouse.run('picX(0.83)'); mouse.s.mouseY = mouse.run('picY(0.91)');
   assert.equal(mouse.run('isOverDivingBoard(mouseX, mouseY)'), true);
@@ -137,17 +137,66 @@ async function main() {
   mouse.frames(22); assert.equal(mouse.landings.length, 1); mouse.render();
   assert.equal(mouse.sounds.get('audio/splash.wav').plays, 1, 'audio still sees one landing transition');
 
-  // Existing off-board pool clicks, wind, and time controls remain usable.
+  // Off-board clicks never create splashes or landing sounds, including during a flight.
+  const clicks = makeApp();
+  for (const [x, y] of [[0.25, 0.8], [0.5, 0.7], [0.2, 0.95], [0.5, 0.3], [-0.1, 0.8]]) {
+    clicks.s.mouseX = clicks.run(`picX(${x})`); clicks.s.mouseY = clicks.run(`picY(${y})`);
+    for (const button of [0, 1, 2]) {
+      clicks.run(`mousePressed({ button: ${button} }); mouseReleased();`);
+      clicks.frames(24);
+      assert.equal(clicks.snapshot().state, 'ready');
+      assert.equal(clicks.landings.length, 0, 'off-board clicks must not produce a splash');
+    }
+  }
+  clicks.s.mouseX = clicks.run('picX(0.83)'); clicks.s.mouseY = clicks.run('picY(0.91)');
+  clicks.run('mousePressed({ button: 2 }); mouseReleased();'); clicks.frames(24);
+  assert.equal(clicks.landings.length, 0, 'right-clicking the board does not start a dive');
+  assert.equal(clicks.sounds.get('audio/splash.wav').plays, 0);
+  clicks.press(); clicks.hold(80, 60); clicks.release();
+  clicks.s.mouseX = clicks.run('picX(0.25)'); clicks.s.mouseY = clicks.run('picY(0.8)');
+  clicks.run('mousePressed({ button: 0 }); mouseReleased();');
+  assert.equal(clicks.landings.length, 0, 'a pool click must not add an immediate splash during flight');
+  clicks.frames(22); assert.equal(clicks.landings.length, 1);
+
+  // Wind and time controls remain usable without clicking a splash into the pool.
   mouse.s.mouseX = mouse.run('picX(0.25)'); mouse.s.mouseY = mouse.run('picY(0.8)');
-  mouse.run('mousePressed({ button: 0 });'); assert.equal(mouse.landings.length, 2);
+  mouse.run('mousePressed({ button: 0 });'); assert.equal(mouse.landings.length, 1);
   mouse.s.mouseX += 100; mouse.run('mouseDragged();'); assert.ok(mouse.run('wind.gust') > 0);
   for (const [key, label] of [['1', 'day'], ['2', 'sunset'], ['3', 'night'], ['4', 'sunrise']]) {
     mouse.s.key = key; mouse.run('keyPressed();'); assert.equal(mouse.run('getTimeOfDayName()'), label);
   }
   mouse.render();
+
+  // Measure the actual plume's drawing geometry at its peak, after p5 transforms.
+  // Power alone is not enough: the renderer's old minimum made weak splashes look broad.
+  function splashBounds(duration) {
+    const app = makeApp();
+    app.press(); app.hold(duration, 60); app.release(); app.frames(52);
+    let transform = { x: 0, y: 0, sx: 1, sy: 1 };
+    const saved = [], points = [];
+    app.s.push = () => saved.push({ ...transform });
+    app.s.pop = () => { assert.ok(saved.length); transform = saved.pop(); };
+    app.s.translate = (x, y) => { transform.x += x * transform.sx; transform.y += y * transform.sy; };
+    app.s.scale = (x, y = x) => { transform.sx *= x; transform.sy *= y; };
+    const point = (x, y) => points.push([transform.x + x * transform.sx, transform.y + y * transform.sy]);
+    app.s.line = (x1, y1, x2, y2) => { point(x1, y1); point(x2, y2); };
+    app.s.ellipse = (x, y, w, h) => { point(x - w / 2, y - h / 2); point(x + w / 2, y + h / 2); };
+    app.run('wind.value = 0; drawOneSplash(splashes.find(splash => splash.active));');
+    assert.ok(points.length > 3000, 'measure the actual brush marks and droplets');
+    assert.equal(saved.length, 0, 'splash transforms must not leak into the scene');
+    assert.deepEqual(transform, { x: 0, y: 0, sx: 1, sy: 1 });
+    const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+    return { width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+  }
+  const shortSize = splashBounds(80), longSize = splashBounds(2500);
+  assert.ok(shortSize.width < longSize.width * 0.4, 'a quick tap must be visibly narrower');
+  assert.ok(shortSize.height < longSize.height * 0.3, 'a quick tap must be visibly shorter');
+  assert.deepEqual(splashBounds(5000), longSize, 'holding past full charge does not enlarge the splash');
+  console.log('Peak splash geometry:', { shortSize, longSize });
   console.log('PASS: 24 duration/frame-rate combinations; near-small to far-large ordering; charge cap;');
   console.log('quick tap after full charge; repeated/mixed controls; direct board hold and outside release;');
-  console.log('one timed splash and landing sound; existing pool/wind/time controls; shared-module rendering.');
+  console.log('one timed splash and landing sound; no off-board click splashes; wind/time controls;');
+  console.log('smaller short-hold plume geometry; shared-module rendering.');
   console.table(samples);
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

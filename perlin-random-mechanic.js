@@ -474,6 +474,15 @@ function drawOneSplash(thisSplash) {
   let baseY = picY(thisSplash.y);
   let power = thisSplash.power;
 
+  // Input iteration (OpenAI Codex assistance): the plume formulas have a broad
+  // minimum, so shrink the entire weak splash, including its marks and droplets.
+  // Scale around its landing point; stronger splashes keep their original size.
+  let sizeScale = constrain(0.3 + power, 0.5, 1);
+  push();
+  translate(baseX, baseY);
+  scale(sizeScale);
+  translate(-baseX, -baseY);
+
   let plumeHeight = PIC_H * 0.28 * (0.4 + 0.6 * power) * depthScale * reach;   // how tall it is right now
   let halfWidth = 68 * depthScale * (0.75 + 0.25 * power);                     // half the width of the cloud
   let alpha = 255 * thisSplash.alpha;
@@ -561,4 +570,5 @@ function drawOneSplash(thisSplash) {
     let size = 1.5 + 2.5 * scatter(i + s0 + 640);
     ellipse(dropX, dropY, size, size);
   }
+  pop();
 }

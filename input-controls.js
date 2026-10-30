@@ -1,8 +1,7 @@
 // input-controls.js
 // MECHANIC: User input  (mouse and keyboard)
 //
-// Idea: the viewer touches the scene in four ways.
-//   click on the pool            -> a splash at that spot
+// Idea: the viewer touches the scene in three ways.
 //   drag the mouse left / right  -> a gust of wind in that direction
 //   hold the board / SPACE, then release -> THE UNSEEN DIVER: charge, jump and splash
 //   move the mouse over the water -> TOUCHING THE WATER: faint ripples follow the pointer
@@ -22,6 +21,8 @@
 // the ripples are a fixed list of rings that grow and fade. Each part is explained in the comments below.
 // This duration-and-distance iteration was developed with OpenAI Codex: elapsed-time charge,
 // release-time sampling, direct board pressing, and the landing preview.
+// The next iteration makes short dives smaller and removes click-to-splash:
+// only releasing a charged board (mouse or SPACE) can produce a user splash.
 //
 // Uses: mousePressed, mouseReleased, mouseDragged, mouseMoved, keyPressed, keyReleased, key, mouseX, mouseY,
 //       millis, frameCount, if / else if, &&, !==, switch, arrays, for loops, %, constrain, lerp, sin, cos, noise.
@@ -46,7 +47,7 @@ const BOARD_DROP = 0.10;    // how far the end of the board goes down when it is
 const NEAR_SPLASH_X = 0.54;
 const FAR_SPLASH_X = 0.18;
 const DIVE_SPLASH_Y = 0.84; // same water depth: perspective must not make a distant splash look smaller
-const MIN_DIVE_POWER = 0.35;
+const MIN_DIVE_POWER = 0.2; // a light tap makes a gentler splash; full charge still reaches 1.8
 const MAX_DIVE_POWER = 1.8;
 
 let diver = {
@@ -116,18 +117,11 @@ function mousePressed(event) {
   startAudio();           // audio-mechanic.js: browsers only allow sound after a click
   lastMouseX = mouseX;    // the drag starts here
 
-  // The board lies over the pool, so test it before the water. Pressing it must
-  // charge one dive rather than also creating a splash under the board.
+  // Only a press on the board can start a mouse-controlled dive.
+  // Clicking the pool or another part of the scene never creates a splash.
   if (isOverDivingBoard(mouseX, mouseY) && (!event || event.button === 0)) {
     beginDiveCharge('mouse');
     return false;
-  }
-
-  // Was the click on the water? (&& means every part must be true.)
-  if (mouseY > picY(WATER_TOP) && mouseY < picY(1) && mouseX > picX(0) && mouseX < picX(1)) {
-    let splashX = (mouseX - BORDER) / PIC_W;
-    let splashY = (mouseY - BORDER) / PIC_H;
-    triggerSplash(splashX, 1, splashY);   // time-mechanic.js
   }
 }
 

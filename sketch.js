@@ -36,7 +36,7 @@ function drawBorderText() {
   text(getTimeOfDayName(), BORDER, BORDER / 2);
 
   textAlign(CENTER, CENTER);
-  let message = 'hold board / SPACE: dive   click pool: splash   drag: wind   1 2 3 4: time   M: music';
+  let message = 'hold board / SPACE, release: splash   drag: wind   1 2 3 4: time   M: music';
   if (diver.state === 'charging') {
     let seconds = (diver.charge * CHARGE_DURATION_MS / 1000).toFixed(1);
     message = 'Hold: ' + seconds + ' s   |   short: near + small   |   long: far + big   |   release to dive';
