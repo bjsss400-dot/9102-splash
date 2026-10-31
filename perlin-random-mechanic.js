@@ -1,6 +1,9 @@
 // perlin-random-mechanic.js
 // Owner: Aokun Liu (Okun) - Perlin noise and randomness.
-// Iteration 3: random batches fall, float briefly, then sink into the pool.
+// Iteration 4.4: every leaf starts in the sky and responds more strongly to wind.
+// Perspective water reflections retain sunlight and moonlight.
+// Green leaves settle onto the water, float, then fade gradually as they sink.
+// The existing wind, palms and splash behaviour are preserved.
 // Built on the group's existing palms and splash drawing.
 // References: https://p5js.org/reference/p5/noise/
 //             https://p5js.org/reference/p5/random/
@@ -17,8 +20,8 @@
 //   - saved random length, curve, thickness, shade and softness for each frond
 //   - a continuous noise() breeze, combined with Input's wind.gust
 //   - stronger independent flutter and slightly delayed palm movement
-//   - fine water lines and random batches of wind-driven falling leaves
-//   - each leaf floats for 1-2 seconds before gently sinking and disappearing
+//   - curved pool reflections and random batches of wind-driven falling leaves
+//   - each leaf floats for 1.5 seconds before gently sinking and disappearing
 // Later iterations can add:
 //   - TODO: the splash: replace scatter() with random() + randomSeed(splash seed), so every splash is
 //           different but does not flicker, and use noise() so neighbouring strokes get similar heights
@@ -39,6 +42,7 @@ let palmWind = [0, 0];         // the two palms take a little time to follow the
 let surfaceTime = 0;
 let waterTravel = 0;
 let waterMarks = [];
+let waterReflections = [];    // small connected pieces of the moving reflection lines
 let poolLeaves = [];           // falling, floating and sinking leaves share one list
 let leafBatchNumber = 0;
 let previousLeafCount = 0;
@@ -97,7 +101,8 @@ function setupVariation() {
 }
 
 function spawnLeafBatch() {
-  // Pick a different count from the previous batch, then save each leaf's traits.
+  // Only the batch count and starting horizontal positions are random.
+  // Every leaf starts above the picture; none are created on the water.
   const counts = LEAF_BATCH_COUNTS.filter(count => count !== previousLeafCount);
   const count = random(counts);
   previousLeafCount = count;
@@ -108,24 +113,36 @@ function spawnLeafBatch() {
       id: ++leafSerial,
       batch: leafBatchNumber,
       state: 'falling',
-      age: -i * random(0.15, 0.4),
-      x: (i + random(0.3, 0.7)) * PIC_W / count,
-      y: picY(0) - random(14, 32),
+      age: -i * 0.22,
+      x: lerp(36, PIC_W - 36, (i + random(0.1, 0.9)) / count),
+      y: picY(0) - 24,
       // The upper part of the pool stays clear of the diving board.
-      landingY: picY(random(0.64, 0.77)),
-      fallSpeed: random(68, 90),
-      floatFor: random(1, 2),
-      sinkFor: random(0.9, 1.4),
-      length: random(12, 22),
-      width: random(3.5, 6.5),
-      angle: random(-PI, PI),
-      shade: random(0.25, 0.85),
-      mobility: random(0.85, 1.15),
-      offset: random(1200, 9000),
+      landingY: picY(0.70),
+      fallSpeed: 78,
+      floatFor: 1.5,
+      sinkFor: 2.2,
+      length: 18,
+      width: 5.2,
+      angle: -PI * 0.2,
+      shade: 0.55,
+      mobility: 1,
+      offset: 1200 + leafSerial * 73.1,
       vx: 0,
       vy: 0
     });
   }
+}
+
+function moveLeafSideways(leaf, targetSpeed, seconds, response) {
+  // Slow down gently near the picture edges instead of wrapping or jumping.
+  // A reversed wind can immediately draw the leaf away from the edge again.
+  const margin = 16;
+  const room = targetSpeed > 0 ? PIC_W - margin - leaf.x : leaf.x - margin;
+  targetSpeed *= constrain(room / 80, 0, 1);
+  leaf.vx = lerp(leaf.vx, targetSpeed, 1 - exp(-response * seconds));
+  const nextX = leaf.x + leaf.vx * seconds;
+  leaf.x = constrain(nextX, margin, PIC_W - margin);
+  if (leaf.x !== nextX) leaf.vx = 0;
 }
 
 // wind.gust is written by input-controls.js; wind.value is written HERE.
@@ -169,25 +186,24 @@ function updateWaterSurface(seconds) {
     if (leaf.age < 0) continue;
 
     if (leaf.state === 'falling') {
-      let sway = (noise(leaf.offset, surfaceTime * 0.45) - 0.5) * 24;
-      let edgePush = max(0, 35 - leaf.x) * 2 - max(0, leaf.x - PIC_W + 35) * 2;
-      let targetX = wind.value * 48 * leaf.mobility + sway + edgePush;
-      leaf.vx = lerp(leaf.vx, targetX, 1 - exp(-3 * seconds));
-      leaf.x = constrain(leaf.x + leaf.vx * seconds, 12, PIC_W - 12);
+      let sway = (noise(leaf.offset, surfaceTime * 0.45) - 0.5) * 32;
+      let targetX = wind.value * 110 + sway;
+      moveLeafSideways(leaf, targetX, seconds, 5);
       let fall = leaf.fallSpeed * (0.9 + noise(leaf.offset + 30, surfaceTime * 0.3) * 0.2);
       leaf.y += fall * seconds;
 
       if (leaf.y >= leaf.landingY) {
         leaf.y = leaf.landingY;
+        leaf.landingPose = leafFallPose(leaf);
         leaf.state = 'floating';
-        leaf.age = 0;          // The 1-2 second hold starts at contact with the water.
+        leaf.age = 0;          // The 1.5 second float starts at contact with the water.
       }
       continue;
     }
 
     // A slow current remains even when wind.value is zero.
     let current = 2 + (noise(leaf.offset, surfaceTime * 0.14) - 0.5) * 3;
-    let targetX = current + wind.value * 28 * leaf.mobility;
+    let targetX = current + wind.value * 60;
     let targetY = (noise(leaf.offset + 50, surfaceTime * 0.16) - 0.5) * 5;
 
     // Gently steer away from the top and bottom of the pool.
@@ -197,9 +213,8 @@ function updateWaterSurface(seconds) {
     targetY -= max(0, leaf.y - bottom + 12) * 0.5;
 
     let follow = 1 - exp(-3.5 * seconds);
-    leaf.vx = lerp(leaf.vx, targetX, follow);
+    moveLeafSideways(leaf, targetX, seconds, 4.5);
     leaf.vy = lerp(leaf.vy, targetY, follow);
-    leaf.x = constrain(leaf.x + leaf.vx * seconds, 12, PIC_W - 12);
     leaf.y = constrain(leaf.y + leaf.vy * seconds, top, bottom);
 
     if (leaf.state === 'floating' && leaf.age >= leaf.floatFor) {
@@ -209,9 +224,9 @@ function updateWaterSurface(seconds) {
   }
 
   const hadLeaves = poolLeaves.length > 0;
-  poolLeaves = poolLeaves.filter(leaf => leaf.state !== 'sinking' || leaf.age < leaf.sinkFor);
+  poolLeaves = poolLeaves.filter(leaf => leafSinkAmount(leaf) < 1);
   if (hadLeaves && poolLeaves.length === 0) {
-    nextLeafBatchAt = surfaceTime + random(0.3, 0.8);
+    nextLeafBatchAt = surfaceTime + 0.5;
   }
   if (poolLeaves.length === 0 && surfaceTime >= nextLeafBatchAt) spawnLeafBatch();
 }
@@ -302,26 +317,176 @@ function drawFrond(p, f) {
 // p5 clip() keeps the strokes and leaves in the pool. push()/pop() restore
 // drawing state so Time's ripples, the splash and the board remain unaffected.
 function clipPoolSurface() {
+  // p5 skips a rect when both fill and stroke are disabled. Set the mask's
+  // style before clip() makes it transparent; the caller's pop restores it.
+  rectMode(CORNER);
+  fill(255);
+  noStroke();
   clip(() => rect(picX(0), picY(WATER_TOP), PIC_W, PIC_H * (1 - WATER_TOP)));
+}
+
+// The water is built in its own flat coordinates, then projected into the pool.
+// Distant shapes become smaller and flatter; foreground shapes open out.
+let waterCellEdges = [];
+
+function projectPoolPoint(x, depth) {
+  const scale = 1 / (2.6 - 1.6 * depth);
+  return {
+    x: picX(0.5) + (x - PIC_W * 0.5) * scale,
+    y: picY(WATER_TOP) + PIC_H * (1 - WATER_TOP) * depth * scale,
+    scale: scale
+  };
+}
+
+// Read the same orbit phase that Time uses, without changing its clock or palette.
+// Moonlight is cooler and much weaker than direct sunlight.
+function poolReflectionLight() {
+  const sunProgress = ((dayPhase + 0.25) % 1) * 2;
+  const moonProgress = ((dayPhase + 0.75) % 1) * 2;
+  function strength(progress) {
+    if (progress > 1) return 0;
+    const elevation = max(0, sin(progress * PI));
+    const fade = easeTimeBlend(progress / 0.035) * easeTimeBlend((1 - progress) / 0.035);
+    return pow(elevation, 0.8) * fade;
+  }
+  const sun = strength(sunProgress);
+  const moon = strength(moonProgress) * 0.24;
+  const progress = sunProgress <= 1 ? sunProgress : moonProgress;
+  return {
+    sun: sun, moon: moon, strength: sun + moon,
+    x: picX(lerp(0.92, 0.08, progress)),
+    ink: sunProgress <= 1
+      ? mixColour(lightColours.squiggle, lightColours.foam, 0.72)
+      : [174, 210, 238]
+  };
+}
+
+// Clip a cell to the half-plane closer to its own centre than a neighbouring one.
+// This makes an irregular shared network, rather than separate circles or stripes.
+function clipWaterCell(polygon, centre, neighbour) {
+  const nx = neighbour.x - centre.x;
+  const ny = neighbour.y - centre.y;
+  const limit = (neighbour.x * neighbour.x + neighbour.y * neighbour.y
+               - centre.x * centre.x - centre.y * centre.y) / 2;
+  const result = [];
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+    const da = a.x * nx + a.y * ny - limit;
+    const db = b.x * nx + b.y * ny - limit;
+    if (da <= 0) result.push(a);
+    if ((da <= 0) !== (db <= 0)) {
+      const amount = da / (da - db);
+      result.push({ x: lerp(a.x, b.x, amount), y: lerp(a.y, b.y, amount) });
+    }
+  }
+  return result;
+}
+
+function createWaterCellEdges() {
+  const centres = [];
+  const spacing = 125;
+  // Sample once to choose irregular centres. All later motion comes from noise.
+  // This does not consume random() values used by the fronds and falling leaves.
+  for (let row = -1; row <= 8; row++) {
+    for (let column = -7; column <= 11; column++) {
+      centres.push({
+        x: (column + (row % 2) * 0.5) * spacing
+           + (noise(220 + column * 7.3, 380 + row * 9.1) - 0.5) * spacing * 1.9,
+        y: row * spacing + (noise(520 + column * 6.1, 780 + row * 8.7) - 0.5) * spacing * 1.9
+      });
+    }
+  }
+  const edges = [];
+  const seen = new Set();
+  for (const centre of centres) {
+    let cell = [{x:-1050,y:-250}, {x:1600,y:-250}, {x:1600,y:1150}, {x:-1050,y:1150}];
+    for (const neighbour of centres) {
+      if (neighbour === centre) continue;
+      cell = clipWaterCell(cell, centre, neighbour);
+      if (!cell.length) break;
+    }
+    for (let i = 0; i < cell.length; i++) {
+      const a = cell[i];
+      const b = cell[(i + 1) % cell.length];
+      const key = [a.x.toFixed(2) + ',' + a.y.toFixed(2),
+                   b.x.toFixed(2) + ',' + b.y.toFixed(2)].sort().join(':');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edges.push({a:a, b:b});
+    }
+  }
+  return edges;
+}
+
+function buildWaterReflections() {
+  if (!waterCellEdges.length) waterCellEdges = createWaterCellEdges();
+  const pieces = [];
+  const light = poolReflectionLight();
+  const time = surfaceTime * 0.16;
+  // Keep the unchanging network in world coordinates. Smooth noise deforms it,
+  // while wind advects the noise field; no cells are regenerated during drawing.
+  for (const edge of waterCellEdges) {
+    const points = [];
+    for (let i = 0; i <= 8; i++) {
+      const x = lerp(edge.a.x, edge.b.x, i / 8);
+      const y = lerp(edge.a.y, edge.b.y, i / 8);
+      const u = (x - waterTravel * 1.6) * 0.004;
+      const v = y * 0.004;
+      const dx = (noise(40 + u, 70 + v, time) - 0.5) * 160;
+      const dy = (noise(180 + u, 230 + v, time) - 0.5) * 120;
+      // Bow each shared edge between its endpoints to soften the cell outlines.
+      // Reversing the edge reverses both its normal and bend, so neighbours agree.
+      const ex = edge.b.x - edge.a.x;
+      const ey = edge.b.y - edge.a.y;
+      const length = max(1, sqrt(ex * ex + ey * ey));
+      const midpointX = (edge.a.x + edge.b.x) * 0.004;
+      const midpointY = (edge.a.y + edge.b.y) * 0.004;
+      const direction = ex < 0 || (ex === 0 && ey < 0) ? -1 : 1;
+      const bow = (noise(620 + midpointX, 740 + midpointY, time * 0.8) - 0.5)
+                  * min(length * 0.9, 100) * sin(PI * i / 8) * direction;
+      points.push(projectPoolPoint(x + dx - ey / length * bow,
+                                   (y + dy + ex / length * bow) / 900));
+    }
+    if (points.every(p => p.x < picX(0) - 20) || points.every(p => p.x > picX(1) + 20)
+        || points.every(p => p.y < picY(WATER_TOP) - 15) || points.every(p => p.y > picY(1) + 25)) continue;
+    const middle = points[4];
+    const shimmer = noise(360 + (edge.a.x - waterTravel) * 0.009, 480 + edge.a.y * 0.009, time * 1.2);
+    const depth = constrain((middle.y - picY(WATER_TOP)) / (PIC_H * (1 - WATER_TOP)), 0, 1);
+    // A broad sun reflection, or a narrower, quieter path under the moon.
+    const spread = light.sun > 0 ? 390 : 110 + depth * 160;
+    const distance = (middle.x - light.x) / spread;
+    const path = exp(-distance * distance * 2);
+    const focus = light.sun > 0 ? 0.62 + path * 0.38 : 0.22 + path * 0.78;
+    pieces.push({
+      points: points,
+      width: (1.7 + shimmer * 2.4) * middle.scale,
+      alpha: (105 + shimmer * 160) * light.strength * focus,
+      ink: light.ink
+    });
+  }
+  return pieces;
+}
+
+function drawWaterCurve(points) {
+  beginShape();
+  curveVertex(points[0].x, points[0].y);
+  for (const point of points) curveVertex(point.x, point.y);
+  const last = points[points.length - 1];
+  curveVertex(last.x, last.y);
+  endShape();
 }
 
 function drawWaterTexture() {
   push();
   clipPoolSurface();
   noFill();
-  let ink = lightColours.squiggle;
-  stroke(ink[0], ink[1], ink[2], 14);
-  strokeWeight(1.5);
-
-  // Broad, faint bands keep the original flat colour while suggesting water.
-  for (let row = 0; row < 20; row++) {
-    let y = picY(WATER_TOP) + row * 14;
-    beginShape();
-    for (let x = 0; x <= PIC_W + 20; x += 20) {
-      let wave = noise((x - waterTravel) * 0.012, row * 0.28, surfaceTime * 0.08);
-      vertex(picX(0) + x, y + (wave - 0.5) * 10);
-    }
-    endShape();
+  waterReflections = buildWaterReflections();
+  // A faint broad stroke gives each bright edge a soft, painted reflection.
+  for (const piece of waterReflections) {
+    stroke(piece.ink[0], piece.ink[1], piece.ink[2], piece.alpha * 0.12);
+    strokeWeight(piece.width * 4.5);
+    drawWaterCurve(piece.points);
   }
   pop();
 }
@@ -330,25 +495,25 @@ function drawWaterLines() {
   push();
   clipPoolSurface();
   noFill();
-  const ink = lightColours.squiggle;
+  for (const piece of waterReflections) {
+    stroke(piece.ink[0], piece.ink[1], piece.ink[2], piece.alpha);
+    strokeWeight(piece.width);
+    drawWaterCurve(piece.points);
+  }
 
-  for (let mark of waterMarks) {
-    let edgeFade = constrain(min(mark.x + mark.length, PIC_W - mark.x) / 28, 0, 1);
-    let shimmer = 0.65 + noise(mark.offset + 20, surfaceTime * 0.25) * 0.55;
-    let depth = map(mark.y, picY(WATER_TOP), picY(1), 0.65, 1.1);
-    strokeWeight(mark.weight * depth);
-
-    // Short tapered segments look like fine brush marks, not a rigid grid.
-    for (let j = 0; j < 10; j++) {
-      let along = j / 10;
-      let next = (j + 1) / 10;
-      let y1 = (noise(mark.offset + along * 0.8, surfaceTime * 0.2) - 0.5) * 4;
-      let y2 = (noise(mark.offset + next * 0.8, surfaceTime * 0.2) - 0.5) * 4;
-      let taper = sin((along + 0.05) * PI);
-      stroke(ink[0], ink[1], ink[2], mark.opacity * shimmer * edgeFade * taper);
-      line(picX(0) + mark.x + along * mark.length, mark.y + y1,
-           picX(0) + mark.x + next * mark.length, mark.y + y2);
-    }
+  // Saved short marks use the same projection and light strength as the network.
+  const light = poolReflectionLight();
+  const height = PIC_H * (1 - WATER_TOP);
+  for (const mark of waterMarks) {
+    const depth = (mark.y - picY(WATER_TOP)) / height;
+    const point = projectPoolPoint(mark.x, depth);
+    const shimmer = max(0, noise(mark.offset, surfaceTime * 0.4) - 0.4);
+    const length = mark.length * 0.45 * point.scale;
+    const bend = (noise(mark.offset + 40, surfaceTime * 0.2) - 0.5) * 5 * point.scale;
+    stroke(light.ink[0], light.ink[1], light.ink[2], shimmer * mark.opacity * 2 * light.strength);
+    strokeWeight(mark.weight * point.scale);
+    bezier(point.x, point.y, point.x + length * 0.3, point.y + bend,
+           point.x + length * 0.7, point.y - bend, point.x + length, point.y);
   }
 
   for (let leaf of poolLeaves) {
@@ -357,18 +522,41 @@ function drawWaterLines() {
   pop();
 }
 
+function poolLeafColour(leaf) {
+  // All falling leaves use the same green, adjusted by the existing day/night light.
+  const green = mixColour([43, 119, 48], [102, 178, 70], leaf.shade);
+  const treeColour = mixColour(lightColours.leafDark, lightColours.leafLight, leaf.shade);
+  // Keep a clear green silhouette while following the palms' changing light.
+  return mixColour(green, treeColour, 0.35 + nightAmount * 0.2);
+}
+
+function leafFallPose(leaf) {
+  return {
+    turn: (noise(leaf.offset + 150, surfaceTime * 0.4) - 0.5) * 1.8 + wind.value * 0.35,
+    tilt: 0.45 + noise(leaf.offset + 90, surfaceTime * 0.65) * 0.8
+  };
+}
+
+function leafSinkAmount(leaf) {
+  if (leaf.state !== 'sinking') return 0;
+  const progress = constrain(leaf.age / leaf.sinkFor, 0, 1);
+  // Start and finish gently, so the last visible frame is almost transparent.
+  return progress * progress * (3 - 2 * progress);
+}
+
 function drawPoolLeaf(leaf) {
-  let sinking = leaf.state === 'sinking' ? constrain(leaf.age / leaf.sinkFor, 0, 1) : 0;
-  let alpha = 235 * constrain(min(leaf.x, PIC_W - leaf.x) / 18, 0, 1);
-  alpha *= (1 - sinking) * (1 - sinking);
+  let sinking = leafSinkAmount(leaf);
+  let alpha = 240 * (1 - sinking);
+  let settle = leaf.state === 'floating' ? constrain(leaf.age / 0.45, 0, 1) : 1;
+  settle = settle * settle * (3 - 2 * settle);
   let bob = (noise(leaf.offset + 100, surfaceTime * 0.35) - 0.5) * 2.5;
-  let turn = (noise(leaf.offset + 150, surfaceTime * 0.2) - 0.5) * 0.8;
-  let shade = mixColour(lightColours.leafDark, lightColours.leafLight, leaf.shade);
-  shade = mixColour(shade, lightColours.boardTop, 0.22);
-  shade = mixColour(shade, lightColours.waterTop, sinking * 0.8);
+  let turn = (noise(leaf.offset + 150, surfaceTime * 0.2) - 0.5) * 0.8 + wind.value * 0.12;
+  const landed = leaf.landingPose || { turn, tilt: 0.68 };
+  let shade = poolLeafColour(leaf);
+  shade = mixColour(shade, lightColours.waterTop, sinking * 0.45);
 
   push();
-  translate(picX(0) + leaf.x, leaf.y + bob + sinking * 10);
+  translate(picX(0) + leaf.x, leaf.y + bob * settle + sinking * 18);
 
   // A small contact ripple places the leaf on the surface.
   noFill();
@@ -384,25 +572,29 @@ function drawPoolLeaf(leaf) {
     ellipse(0, 1.5, leaf.length * (1 + contact * 2.5), 3 + contact * 6);
   }
 
-  rotate(leaf.angle + turn + wind.value * 0.12);
-  scale(1 - sinking * 0.18, (1 - sinking * 0.18) * 0.68);
+  rotate(leaf.angle + lerp(landed.turn, turn, settle));
+  scale(1 - sinking * 0.12, (1 - sinking * 0.12) * lerp(landed.tilt, 0.68, settle));
   drawLeafShape(leaf, shade, alpha);
   pop();
 }
 
 function drawFallingLeaves() {
   push();
+  // Earlier ripple drawing may leave noFill() and noStroke() active.
+  // Enable the rectangle mask before clip(), even when there are no ripples.
+  rectMode(CORNER);
+  fill(255);
+  noStroke();
   clip(() => rect(picX(0), picY(0), PIC_W, PIC_H));
   for (let leaf of poolLeaves) {
     if (leaf.state !== 'falling' || leaf.age < 0) continue;
-    let turn = (noise(leaf.offset + 150, surfaceTime * 0.4) - 0.5) * 1.6;
-    let shade = mixColour(lightColours.leafDark, lightColours.leafLight, leaf.shade);
-    shade = mixColour(shade, lightColours.boardTop, 0.3);
+    let pose = leafFallPose(leaf);
+    let shade = poolLeafColour(leaf);
     push();
     translate(picX(0) + leaf.x, leaf.y);
-    rotate(leaf.angle + turn + wind.value * 0.2);
+    rotate(leaf.angle + pose.turn);
     // Tipping as it falls changes the silhouette smoothly, without new randomness.
-    scale(1, 0.45 + noise(leaf.offset + 90, surfaceTime * 0.65) * 0.8);
+    scale(1, pose.tilt);
     drawLeafShape(leaf, shade, 240);
     pop();
   }
@@ -410,7 +602,9 @@ function drawFallingLeaves() {
 }
 
 function drawLeafShape(leaf, shade, alpha) {
-  noStroke();
+  const edge = mixColour([21, 69, 36], [17, 44, 32], nightAmount);
+  stroke(edge[0], edge[1], edge[2], alpha * 0.85);
+  strokeWeight(0.65);
   fill(shade[0], shade[1], shade[2], alpha);
   let l = leaf.length;
   let w = leaf.width;
@@ -419,7 +613,8 @@ function drawLeafShape(leaf, shade, alpha) {
   bezierVertex(-l * 0.15, -w, l * 0.3, -w * 0.65, l / 2, 0);
   bezierVertex(l * 0.08, w * 0.85, -l * 0.35, w * 0.65, -l / 2, 0);
   endShape(CLOSE);
-  stroke(lightColours.leafDark[0], lightColours.leafDark[1], lightColours.leafDark[2], alpha * 0.55);
+  const vein = mixColour(shade, lightColours.foam, 0.38);
+  stroke(vein[0], vein[1], vein[2], alpha * 0.85);
   strokeWeight(0.65);
   line(-l * 0.38, 0, l * 0.35, 0);
 }

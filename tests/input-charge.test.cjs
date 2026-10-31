@@ -17,9 +17,10 @@ function makeApp() {
     resume: async () => {}, createOscillator: audioNode, createBiquadFilter: audioNode, createGain: audioNode };
   const s = {
     console, Math, PI: Math.PI, TWO_PI: Math.PI * 2,
-    CENTER: 'center', LEFT: 'left', RIGHT: 'right', CLOSE: 'close',
+    CENTER: 'center', LEFT: 'left', RIGHT: 'right', CLOSE: 'close', CORNER: 'corner',
+    drawingContext: { globalAlpha: 1 },
     frameCount: 0, deltaTime: 1000 / 60, mouseX: 0, mouseY: 0, key: '', width: 660, height: 660,
-    sin: Math.sin, cos: Math.cos, min: Math.min, max: Math.max, abs: Math.abs, floor: Math.floor, exp: Math.exp,
+    sin: Math.sin, cos: Math.cos, min: Math.min, max: Math.max, abs: Math.abs, floor: Math.floor, exp: Math.exp, pow: Math.pow, sqrt: Math.sqrt,
     constrain: (n, a, b) => Math.max(a, Math.min(b, n)), lerp: (a, b, t) => a + (b - a) * t,
     map: (n, a, b, c, d) => c + (n - a) / (b - a) * (d - c),
     millis: () => now, noise: (...args) => 0.5 + 0.3 * Math.sin(args.reduce((a, b) => a + b, 0)),
@@ -44,7 +45,7 @@ function makeApp() {
   };
   for (const name of ['background', 'ellipse', 'line', 'fill', 'noFill', 'stroke', 'noStroke', 'strokeWeight',
     'quad', 'rect', 'rectMode', 'rotate', 'scale', 'text', 'textSize', 'textAlign', 'translate',
-    'beginShape', 'endShape', 'vertex', 'bezierVertex']) {
+    'beginShape', 'endShape', 'vertex', 'bezierVertex', 'applyMatrix', 'curveVertex', 'bezier']) {
     s[name] = (...args) => {
       for (const n of args.flat()) if (typeof n === 'number') assert.ok(Number.isFinite(n), name);
       if (name === 'ellipse' || name === 'line') drawing.push({ name, args });
