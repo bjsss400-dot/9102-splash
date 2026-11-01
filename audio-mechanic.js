@@ -1,7 +1,7 @@
 // Audio mechanic — music amplitude drives the diving board.
 // AI assistance: initial implementation created with OpenAI Codex.
 // Replace this path with a file inside audio/ to use your own music.
-const AUDIO_FILE = 'audio/demo.mp3';
+const AUDIO_FILE = 'audio/demo.wav';
 const SPLASH_FILE = 'audio/splash.wav';
 let landingSound, landingSoundReady = false;
 let audioState = { loaded: false, started: false, level: 0 };
