@@ -366,24 +366,19 @@ function drawTimeReflections() {
   translate(sin(millis() / 950) * 1.2, picY(WATER_TOP) + 0.62 * picY(DECK_TOP));
   scale(1, -0.62);
   drawPalms();
-  drawHouse();
-  drawChair();
-  pop();
-  if (nightAmount === 0) return; // Daylight: skip 130 fully invisible window-light bands.
-  // Broken horizontal bands under the five real glass panes suggest rippling
-  // light. Their width/wobble changes with depth; nightAmount fades them in/out.
-  push();
-  timeSurfaceClip(WATER_TOP, 1);
-  noStroke();
-  let panes = [[0.003, 0.045], [0.052, 0.110], [0.149, 0.228], [0.235, 0.317], [0.324, 0.360]];
-  for (let pane of panes) {
-    for (let i = 0; i < 26; i++) {
-      let depth = i / 26, wave = sin(millis() / 650 + i * 1.3 + pane[0] * 20);
-      let x = pane[0] + wave * (0.002 + depth * 0.006);
-      fill(255, 208, 117, nightAmount * (1 - depth) * (48 + 20 * wave));
-      rect(picX(x), picY(WATER_TOP + 0.006 + depth * 0.23), PIC_W * (pane[1] - pane[0]), 1.5 + depth);
+  // Blend small offsets to soften only the house, without a costly per-stroke blur.
+  // The centre has more weight so the reflection stays soft rather than doubled.
+  let weights = [1, 4, 6, 4, 1], opacity = drawingContext.globalAlpha;
+  for (let y = 0; y < weights.length; y++) {
+    for (let x = 0; x < weights.length; x++) {
+      push();
+      drawingContext.globalAlpha = opacity * weights[x] * weights[y] / 256;
+      translate((x - 2) * 4, (y - 2) * 6);
+      drawHouse();
+      pop();
     }
   }
+  drawChair();
   pop();
 }
 
