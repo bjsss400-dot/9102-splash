@@ -2,9 +2,6 @@
 // AI ACKNOWLEDGEMENT — OpenAI ChatGPT (Codex)
 // ChatGPT helped structure the original code, like generate the shadow/reflection
 // layers and explain/test their integration, solar progress projects shadows, etc.
-// millis: https://p5js.org/reference/p5/millis/
-// Defaults: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Default_parameters
-// globalAlpha: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalAlpha
 const DAY_LENGTH = 80000, START_PHASE = 0.02;
 const JUMP_PHASES = [0, 0.225, 0.5, 0.775]; // keys 1–4: day, sunset, night, sunrise
 const TIME_PALETTES = {
@@ -66,8 +63,8 @@ const TIME_LIGHT_STOPS = [
 ];
 const TIME_SPLASH_DURATION = { rising: 480, peak: 180, falling: 620, fading: 600 };
 const TIME_RIPPLE_DURATION = 2200, TIME_MAX_RIPPLES = 36;
-// Object.keys lists the palette's names, avoiding a second list to maintain.
-// Extra: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/keys
+// `MDN Object.keys()`: lists the palette colour names so every part of the scene can change colour together.
+// This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/keys
 const TIME_COLOUR_NAMES = Object.keys(TIME_PALETTES.day);
 let lightColours = {}, nightAmount = 0, dayPhase = START_PHASE, timeShift = 0;
 let splashes = [], timeRipples = [], timeStars = [], timeSplashSeed = 0;
@@ -75,12 +72,15 @@ let timeHooksInstalled = false;
 
 // AI assistance: reuse six splash objects and place fixed stars with %.
 // No random() or randomSeed() calls: Perlin's saved random sequence stays intact.
+// Background on object pools (the six slots are reused for successive splashes):
 function setupTimeMechanic() {
   timeShift = millis() - START_PHASE * DAY_LENGTH;
   splashes = [];
   timeRipples = [];
   timeStars = [];
   timeSplashSeed = 0;
+  // `Object pooling`: reuses six splash records, choosing a free one first or the oldest active one when all six are in use.
+  // This technique is documented at https://gameprogrammingpatterns.com/object-pool.html
   for (let i = 0; i < 6; i++) splashes.push({ active: false, startedAt: 0 });
   for (let i = 0; i < 55; i++) {
     timeStars.push({ x: 0.025 + (i * 37 % 101) / 101 * 0.95,
@@ -94,9 +94,15 @@ function setupTimeMechanic() {
 // AI assistance: a millisecond clock keeps the 80-second day independent
 // of frame rate. Backwards removal keeps every remaining array index valid.
 function updateTimeMechanic() {
+  // `p5.js millis()`: reads elapsed milliseconds for the 80-second day cycle and the separate splash and ripple timers.
+  // This technique is from https://p5js.org/reference/p5/millis/
   let now = millis();
+  // `JavaScript remainder (%)`: wraps the clock offset into the current 80-second cycle before converting it to a value from 0 up to 1.
+  // This technique is documented at https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Remainder
   dayPhase = ((now - timeShift) % DAY_LENGTH + DAY_LENGTH) % DAY_LENGTH / DAY_LENGTH;
   updateTimeLighting();
+  // `JavaScript for...of`: visits each splash record so active splashes can be updated using the current time.
+  // This technique is documented at https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for...of
   for (let splash of splashes) if (splash.active) updateTimedSplash(splash, now);
   for (let i = timeRipples.length - 1; i >= 0; i--) {
     if (now - timeRipples[i].startedAt >= TIME_RIPPLE_DURATION) timeRipples.splice(i, 1);
@@ -105,6 +111,8 @@ function updateTimeMechanic() {
 
 // AI assistance: cosine easing slows both ends; lerp mixes RGB channels.
 function easeTimeBlend(amount) {
+  // `Sine easing`: makes a lighting transition change slowly at the start and end and faster in the middle.
+  // This technique is documented at https://easings.net/#easeInOutSine
   return (1 - cos(constrain(amount, 0, 1) * PI)) / 2;
 }
 function mixColour(a, b, amount) {
@@ -158,9 +166,11 @@ function drawSkyObjects() {
 function drawTimeOrb(progress, isMoon) {
   let elevation = sin(progress * PI), low = 1 - elevation;
   let x = picX(lerp(0.92, 0.08, progress));
-  // Math.pow(elevation, 0.75) preserves the original slightly flattened arc.
-  // Extra: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/pow
+  // `MDN Math.pow()`: raises the elevation to the power of 0.75 to shape the vertical path of the sun and moon.
+  // This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/pow
   let y = picY(lerp(HORIZON + 0.02, 0.28, progress) - 0.30 * Math.pow(elevation, 0.75));
+  // `JavaScript conditional operator (? :)`: chooses the size, colour and glow for the sun or moon.
+  // This technique is documented at https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Conditional_operator
   let diameter = PIC_W * (isMoon ? 0.033 : 0.037) * (1 + 0.65 * low);
   let colour = mixColour(isMoon ? [242, 246, 220] : [255, 249, 204],
     isMoon ? [255, 228, 184] : [255, 159, 77], low);
@@ -173,10 +183,13 @@ function drawTimeOrb(progress, isMoon) {
 
 // AI assistance : free/oldest-object reuse preserves Input/Audio's API.
 // isFinite rejects invalid drawing coordinates; defaults preserve old callers.
-// Extra: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/isFinite
+// `JavaScript default parameters`: gives a splash its default strength and water position when those arguments are omitted.
+// This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Default_parameters
 function triggerSplash(x, power = 1, y = SPLASH_BASE_Y) {
   if (power == undefined) power = 1;
   if (y == undefined) y = SPLASH_BASE_Y;
+  // `MDN Number.isFinite()`: checks that the splash coordinates and strength are finite before applying their limits.
+  // This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/isFinite
   if (!Number.isFinite(x) || !Number.isFinite(power) || !Number.isFinite(y) || !splashes.length) return;
   let splash = splashes[0];
   for (let item of splashes) {
@@ -230,9 +243,13 @@ function updateTimedSplash(splash, now) {
 }
 
 // AI assistance: splice removes expired/oldest entries without copying
-// a whole array. Source: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/splice
+// a whole array.
 function addTimeRipple(splash, startedAt, strength) {
+  // `JavaScript property shorthand`: stores startedAt and strength on each ripple using their existing variable names.
+  // This technique is documented at https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Object_initializer
   timeRipples.push({ x: splash.x, y: splash.y, power: splash.power, startedAt, strength });
+  // `MDN Array.splice()`: drops the oldest ripples above the limit of 36 and removes expired ripples in updateTimeMechanic().
+  // This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/splice
   if (timeRipples.length > TIME_MAX_RIPPLES) timeRipples.splice(0, timeRipples.length - TIME_MAX_RIPPLES);
 }
 // AI assistance: elapsed progress expands and fades flattened rings.
@@ -256,9 +273,10 @@ function drawRipples() {
 // AI assistance: install drawing hooks ONCE. A saved function is called before/after Time's layer (same pattern as
 // Audio's updateBoard wrapper). Only the board renderer is replaced, to remove
 // its old fixed shadow; its 24 slices, bend limits and faces are retained below.
-// Extra functions-as-values: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Functions
 function installTimeDrawing() {
   if (timeHooksInstalled) return;
+  // `JavaScript functions as values`: saves the original deck and water drawing functions so shadows and reflections can be added in order.
+  // This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Functions
   let deck = drawDeck, texture = drawWaterTexture;
   drawDeck = function () { deck(); drawTimeShadows(DECK_TOP, DECK_BOTTOM); };
   drawWaterTexture = function () {
@@ -282,10 +300,14 @@ function timeSunlight() {
 }
 
 // AI assistance: clip prevents drawing over the coping/border.
-// Extra (also used by Perlin): https://p5js.org/reference/p5/clip/
+// The Perlin mechanic also uses this mask technique.
 function timeSurfaceClip(top, bottom) {
   fill(255); // Input's touch rings leave noFill() active; a mask needs a filled path.
   noStroke();
+  // `p5.js clip()`: keeps shadows inside the selected deck or water area and reflections inside the pool.
+  // This technique is from https://p5js.org/reference/p5/clip/
+  // `JavaScript arrow function`: passes a callback to clip() that draws the rectangle used as the mask.
+  // This technique is documented at https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions
   clip(() => rect(picX(0), picY(top), PIC_W, PIC_H * (bottom - top)));
 }
 
@@ -295,19 +317,23 @@ function timeSurfaceClip(top, bottom) {
 // applyMatrix maps a point to x + sun.x*(base-y), base + sun.y*(base-y).
 // globalAlpha makes the silhouette translucent. push/pop
 // restore ALL drawing settings. The chair's existing small ellipse is contact shade.
-// Extra: https://p5js.org/reference/p5/applyMatrix/
-// https://p5js.org/reference/p5/drawingContext/
 function drawTimeShadows(top, bottom) {
   let sun = timeSunlight();
   if (sun.strength === 0) return;
   push();
   timeSurfaceClip(top, bottom);
   fill(0);
+  // `p5.js drawingContext`: accesses the underlying 2D canvas context so a whole shadow or reflection layer can share one opacity.
+  // This technique is from https://p5js.org/reference/p5/drawingContext/
+  // `Canvas 2D globalAlpha`: sets shadow opacity from the sunlight strength and dims reflected objects at night.
+  // This technique is from https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalAlpha
   drawingContext.globalAlpha = 0.16 * sun.strength;
   let objects = [drawTimeHouseShadow, drawTimePalmShadow, drawTimeChairShadow], bases = [DECK_TOP, 0.456, 0.472];
   for (let i = 0; i < objects.length; i++) {
     push();
     let base = picY(bases[i]);
+    // `p5.js applyMatrix()`: projects the house, palm and chair silhouettes away from the sun, with longer shadows when the sun is low.
+    // This technique is from https://p5js.org/reference/p5/applyMatrix/
     applyMatrix(1, 0, -sun.x, -sun.y, sun.x * base, (1 + sun.y) * base);
     objects[i]();
     pop();
@@ -364,10 +390,15 @@ function drawTimeReflections() {
   timeSurfaceClip(WATER_TOP, 1);
   drawingContext.globalAlpha = lerp(0.26, 0.12, nightAmount);
   translate(sin(millis() / 950) * 1.2, picY(WATER_TOP) + 0.62 * picY(DECK_TOP));
+  // `p5.js scale()`: flips the house, palms and chair vertically and compresses their reflections to 62% of their height.
+  // This technique is documented at https://p5js.org/reference/p5/scale/
   scale(1, -0.62);
   drawPalms();
   // Blend small offsets to soften only the house, without a costly per-stroke blur.
   // The centre has more weight so the reflection stays soft rather than doubled.
+  // Each offset redraw uses its row and column weights to set opacity. The 25 weights sum to 256 before normalisation.
+  // `5 × 5 binomial weights`: softens the house reflection by drawing 25 shifted copies, giving the centre copy the most opacity.
+  // This technique is documented at https://docs.opencv.org/4.8.0/d4/d86/group__imgproc__filter.html
   let weights = [1, 4, 6, 4, 1], opacity = drawingContext.globalAlpha;
   for (let y = 0; y < weights.length; y++) {
     for (let x = 0; x < weights.length; x++) {
@@ -419,13 +450,18 @@ function drawTimeBoard(waterOnly) {
 }
 
 // Walk one edge forwards and the opposite edge backwards to close the strip.
-// Extra: https://p5js.org/reference/p5/beginShape/ and https://p5js.org/reference/p5/vertex/
 function timeBoardFace(edges, dx, dy, side) {
+  // `p5.js beginShape()`: starts the outline of one face of the bending diving board.
+  // This technique is from https://p5js.org/reference/p5/beginShape/
   beginShape();
+  // `p5.js vertex()`: traces the board along one edge and back along the opposite edge to form the face.
+  // This technique is from https://p5js.org/reference/p5/vertex/
   for (let e of edges) vertex(picX(e[0] + dx), picY(e[1] + (side ? 0 : dy)));
   for (let i = edges.length - 1; i >= 0; i--) {
     let e = edges[i], column = side ? 0 : 2;
     vertex(picX(e[column] + dx), picY(e[column + 1] + dy));
   }
+  // `p5.js endShape(CLOSE)`: joins the last point to the first to close the board face.
+  // This technique is documented at https://p5js.org/reference/p5/endShape/
   endShape(CLOSE);
 }

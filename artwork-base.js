@@ -1,14 +1,12 @@
 // artwork-base.js
 // THE STATIC SCENE – our reinterpretation of David Hockney's "A Bigger Splash" (1967),
 // laid out like the original painting.
-// (Owner: User input member. This file only draws the flat blocks; it never decides colours.)
-//
-// AI acknowledgement: the drawing code in this file was written with the help of Claude (Anthropic). The shapes,
-// positions and colours come from measurements of Hockney's painting and of the reference images our team
-// collected (see the README). Claude was used for the layout in fractions of the picture (picX and picY), the
+
+// AI acknowledgement: the drawing code in this file was written with the help of Claude (Anthropic).
+// Claude was used for the layout in fractions of the picture (picX and picY), the
 // reflections in the glass (skyline, palms, bush, curtains), the director's chair and the bending diving board.
 // Each part is explained in the comments next to it.
-//
+
 // What we noticed in the original:
 //  - an almost square picture on a beige canvas, with an unpainted border
 //  - everything is flat colour with sharp edges: sky, a low house, a wide pink deck, a pool
@@ -19,10 +17,10 @@
 //  - the diving board comes in from the bottom right and points at the splash
 //
 // The geometry stays still. What moves and changes is handed to the mechanics:
-//   colours of every block  -> time-mechanic.js   (lightColours)
+//   colors of every block  -> time-mechanic.js   (lightColors)
 //   palms, water, splash    -> perlin-random-mechanic.js
 //   sun, moon, stars        -> time-mechanic.js
-
+  
 // ---- layout. The canvas is 660 x 660; the painted picture is 600 x 600 inside a 30 px border ----
 const BORDER = 30;
 const PIC_W = 600;
