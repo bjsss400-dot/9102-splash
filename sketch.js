@@ -12,7 +12,6 @@ function setup() {
   setupAudioMechanic();
 }
 
-// Order matters (Week 6): each mechanic updates its numbers, then the whole scene is drawn.
 function draw() {
   background(228, 218, 201);   // warm beige: the border of the picture
 

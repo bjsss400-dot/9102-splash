@@ -10,13 +10,6 @@ let audioStarting = false;
 let audioLastOffset = 0;
 
 function setupAudioMechanic() {
-  landingSound = loadSound(SPLASH_FILE, () => {
-    landingSoundReady = true;
-    landingSound.playMode('restart');
-  }, () => {
-    console.error('Could not load landing sound: ' + SPLASH_FILE);
-    audioStatus.html('Water sound could not load. Check audio/splash.wav and refresh.');
-  });
   // Strip our visual offset before the input member updates its spring.
   const originalUpdateBoard = updateBoard;
   updateBoard = function () {
@@ -32,6 +25,13 @@ function setupAudioMechanic() {
   audioGain = createSlider(0, 2, 1, 0.05);
   audioGain.attribute('aria-label', 'Music response strength');
   audioStatus = createP('Loading music…');
+  landingSound = loadSound(SPLASH_FILE, () => {
+    landingSoundReady = true;
+    landingSound.playMode('restart');
+  }, () => {
+    console.error('Could not load landing sound: ' + SPLASH_FILE);
+    audioStatus.html('Water sound could not load. Check audio/splash.wav and refresh.');
+  });
   audioAnalyser = new p5.Amplitude(0.75);
   audioTrack = loadSound(AUDIO_FILE, () => {
     audioState.loaded = true;
