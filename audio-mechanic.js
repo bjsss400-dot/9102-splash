@@ -1,7 +1,7 @@
 // Audio mechanic — music amplitude drives the diving board.
 // AI assistance: initial implementation created with OpenAI Codex.
 // Replace this path with a file inside audio/ to use your own music.
-const AUDIO_FILE = 'audio/demo.mp3';
+const AUDIO_FILE = 'audio/demo.wav';
 const SPLASH_FILE = 'audio/splash.wav';
 let landingSound, landingSoundReady = false;
 let audioState = { loaded: false, started: false, level: 0 };
@@ -10,13 +10,6 @@ let audioStarting = false;
 let audioLastOffset = 0;
 
 function setupAudioMechanic() {
-  landingSound = loadSound(SPLASH_FILE, () => {
-    landingSoundReady = true;
-    landingSound.playMode('restart');
-  }, () => {
-    console.error('Could not load landing sound: ' + SPLASH_FILE);
-    audioStatus.html('Water sound could not load. Check audio/splash.wav and refresh.');
-  });
   // Strip our visual offset before the input member updates its spring.
   const originalUpdateBoard = updateBoard;
   updateBoard = function () {
@@ -32,6 +25,13 @@ function setupAudioMechanic() {
   audioGain = createSlider(0, 2, 1, 0.05);
   audioGain.attribute('aria-label', 'Music response strength');
   audioStatus = createP('Loading music…');
+  landingSound = loadSound(SPLASH_FILE, () => {
+    landingSoundReady = true;
+    landingSound.playMode('restart');
+  }, () => {
+    console.error('Could not load landing sound: ' + SPLASH_FILE);
+    audioStatus.html('Water sound could not load. Check audio/splash.wav and refresh.');
+  });
   audioAnalyser = new p5.Amplitude(0.75);
   audioTrack = loadSound(AUDIO_FILE, () => {
     audioState.loaded = true;
