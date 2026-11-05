@@ -1,17 +1,16 @@
-# Zihuai Liu — Audio iteration record / 音频迭代记录
+# Audio development record
 
-本目录保存音频模块的历史快照和迭代说明。根目录是当前运行的作业，组员文件保持不变。
+Contributor: Zihuai Liu
 
-| 迭代 | 内容 | 状态 |
-| --- | --- | --- |
-| 1 | 音乐实际响度与波峰驱动小、中、大水花 | 原始源文件已归档：`01-music-driven-splashes/` |
-| 2 | 音乐驱动跳板、蓄力挤压声、回弹声、真实落水录音 | 当前效果已归档：`02-board-and-water-audio/` |
-| 3 | 尚未开发 | 暂不创建代码或提交 |
+This directory contains two historical audio implementations and their development notes. The running artwork uses the root `audio-mechanic.js` and `audio/`; `index.html` does not load either archive.
 
-第一次归档来自用户提供的 `bigger-splash-audio 2`。当前第二版音频此前已在提交 `149717a` 中上传。本次按实际来源补充历史版本说明，不倒改 Git 历史，不将尚未开发的第三版写成已完成。
+| Version | Design | Archive commit | Files |
+| --- | --- | --- | --- |
+| 1 | Measured music peaks trigger small, medium and large splashes. | `611ecc3` | [Music-driven splashes](01-music-driven-splashes/ITERATION.md) |
+| 2 | Music moves the idle board; charging, release and landing receive sound feedback. | `cecc651` | [Board and water audio](02-board-and-water-audio/ITERATION.md) |
 
-## 本次归档提交
+The first implementation was preserved from the contributor's original `bigger-splash-audio 2` package. The second had already been added in `149717a` before its archive was created. Archive commits record preservation of existing work, rather than when each idea was first developed. No third implementation is included.
 
-- 第一版：保存用户提供的音乐波峰检测代码、原始配乐、行为测试与原始使用说明。
-- 第二版：保存当前运行版本的音频模块和两个 WAV，解释由第一版到当前交互的设计变化、用户反馈和修复。
-- 归档目录用于对照学习，不会被根目录 index.html 加载，也不会改变当前画面。
+The archived JavaScript, audio, tests and music-generation tool are historical snapshots. Their documentation is maintained to distinguish them from the current application. Later root-level integration includes the corrected music path, restored assets and initialization of status controls before sound-loading callbacks.
+
+See each version's AI acknowledgement and source notes. Existing Git commits retain their original messages and contents; these English documentation updates do not rewrite that history.

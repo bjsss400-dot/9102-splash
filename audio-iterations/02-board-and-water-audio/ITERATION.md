@@ -1,38 +1,35 @@
-# Iteration 2 — Board and water audio / 跳板与入水声音交互
+# Iteration 2 — Board and water audio
 
-Contributor: Zihuai Liu  
-Snapshot: current approved effect, originally uploaded in commit `149717a`. Archived on 2026-10-23.
+Contributor: Zihuai Liu
+Implementation previously added in `149717a`; snapshot archived in `cecc651` on 23 October 2026.
 
-## 从第一版改了什么、为什么
+## Design change
 
-第一版主要由音乐波峰触发不同大小的水花。第二版把重点转向组员已有的跳板与空格跳水交互，让声音与动作同步。当前模块没有保留第一版的音乐自动触发水花检测。
+Version 1 used music peaks to trigger different splash sizes. Version 2 connects audio to the group's board and Space-key dive. It does not retain automatic music-triggered splashes.
 
-1. **音乐驱动跳板**：测量背景音轨响度，平滑后映射为跳板弯曲偏移；加入振幅滑块，使音乐引起的动作更容易观察。
-2. **蓄力声音**：按住空格时持续发出低沉挤压声，随蓄力调整音高和强度；仅在 charging 状态播放，避免背景音乐振动反复触发。
-3. **回弹声音**：松开空格、从 charging 转为 flying 时，播放一次短促回弹声。
-4. **落水声音**：从 flying 转为 ready 时播放用户提供的 `y2362.wav`，在项目中命名为 `audio/splash.wav`。保持原始音高，蓄力影响音量。
-5. **振幅调整**：音乐偏移系数从早期试作的 0.42 提高到 0.95；蓄力时增加 `charge * 0.45` 的视觉偏移。
-6. **修复空格后画面消失**：音效节点改用逐条 connect，解决原先链式连接返回值导致的报错。
+1. **Music-driven board:** smooth the track amplitude and add a visual offset to the idle board. A slider controls response strength.
+2. **Charging:** sustain a filtered sawtooth sound while charging. Charge affects pitch and gain.
+3. **Rebound:** play one synthesized tone on the transition from charging to flying.
+4. **Landing:** play the supplied recording, originally named `y2362.wav` and stored as `audio/splash.wav`. Charge changes gain, not pitch.
+5. **Visual tuning:** development notes record increasing the music response coefficient from 0.42 to 0.95, plus an offset of `charge * 0.45` while charging.
+6. **Connection fix:** development notes record replacing chained audio-node connections with separate `connect()` calls after an error interrupted the scene.
 
-## 实际调整过程
+## Development notes
 
-- 初步加入音乐响度映射、播放/暂停、振幅滑块和示范曲。
-- 根据用户反馈增加蓄力挤压、松开回弹、入水声音，并修复音频连接错误。
-- 初版合成水花偏嘶声，之后试作低频扑通声；最终依用户提供的 WAV 替换合成水花。
-- 用户上传的 MOV 只有画面、没有音轨，未用于最终声音；最终使用的是另行提供的 WAV。
+Playback controls, the response slider and demonstration music were followed by charge, rebound and landing feedback. Earlier synthesized splash attempts were replaced with the supplied WAV. A previously supplied MOV had no audio track and was not used as the final sound source. These are development decisions; source snapshots of every intermediate experiment are not included.
 
-上述步骤是第二版的开发过程说明，没有为缺失的中间源文件重建或伪造旧快照。
+## Archived files and current application
 
-## 文件与运行
+The archived JavaScript and two WAV files preserve the version in `cecc651`. The root directory remains the runnable application. The two WAV files still match their root counterparts, but the root JavaScript subsequently changed: status controls are now created before loading the landing sound. The historical JavaScript has not been updated to match it.
 
-本目录的 `audio-mechanic.js`、`audio/demo.wav`、`audio/splash.wav` 与项目根目录当前版本逐字节一致。根目录仍为实际运行版本。
+Run the root `index.html` through Live Server or another HTTP server. Click to start music, use M to pause or resume it, and hold/release Space to dive. The slider changes visual response; M controls background music independently of dive effects.
 
-使用 VS Code Live Server 打开根目录 `index.html`：点击画面开始音乐；M 暂停/继续背景音乐；按住空格蓄力，松开跳水；滑块调整音乐对跳板的影响。M 控制背景音乐，跳水特效仍可播放。
+The module depends on the group's `board`, `diver`, `updateBoard()` and p5.sound. Its wrapper removes the previous visual offset before the next spring calculation.
 
-该模块依赖小组已有的 `board`、`diver`、`updateBoard()` 和 p5.sound。它在自己的 setup 中包装跳板更新函数，在下一帧弹簧计算前移除上一帧视觉偏移；无需编辑组员文件。
+## Sources and AI assistance
 
-## 验证与来源
+- `demo.wav` is described in the development record as a program-generated demonstration loop, distinct from the 24-second version-1 track.
+- The contributor confirms that `splash.wav` was downloaded online. Its original page, creator and reuse terms have not yet been recorded; attribution remains incomplete.
+- OpenAI Codex assisted with the implementation; the acknowledgement remains in the archived source.
 
-当前版本已通过 JavaScript 语法检查，并在浏览器实际按空格完成跳水后检查，未出现新增控制台错误。归档时核对三个文件的 SHA-256，确保与当前版本一致。
-
-背景音乐 demo.wav 是程序生成的原创示范循环；splash.wav 是用户提供的录音文件，未另行确认其许可来源。代码由 Codex 协助完成，保留 AI acknowledgement。第三次迭代尚未开发，本次不创建。
+Earlier notes reported syntax/browser checks and matching hashes at the time of archiving. Those historical checks do not establish that this snapshot is identical to the current application or verified in every browser.

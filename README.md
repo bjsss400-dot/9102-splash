@@ -15,7 +15,7 @@ For the water, Hockney's pool paintings also informed the use of curved, connect
 3. Open the local address in a desktop browser with a mouse and keyboard.
 4. For the combined version, keep the `audio/` folder alongside `index.html`. Click **Play music** to start sound.
 
-The page loads p5.js 1.9.4 and p5.sound 1.9.4 from a CDN, so an internet connection is needed. No build step is required. Use a web server rather than opening the HTML file directly, so the sound files can load correctly. The canvas is currently fixed at 660 × 660 pixels.
+The page loads p5.js 1.9.4 and the accompanying p5.sound add-on from a CDN, so an internet connection is needed. No build step is required. Use a web server rather than opening the HTML file directly, so the sound files can load correctly. The canvas is currently fixed at 660 × 660 pixels.
 
 ## Interaction guide
 
@@ -27,7 +27,7 @@ The page loads p5.js 1.9.4 and p5.sound 1.9.4 from a CDN, so an internet connect
 | Click inside the pool | Trigger a splash and expanding ripples. |
 | Hold Space, then release | Bend the diving board and launch an unseen dive. Holding longer increases the charge. |
 | Press `1`, `2`, `3` or `4` | Jump to day, sunset, night or sunrise. The automatic cycle continues afterwards. |
-| Click **Play music**, or press `M` | Start, pause or resume music once the audio module and sound files are integrated. |
+| Click **Play music**, or press `M` | Start, pause or resume background music. Dive sound effects remain available when music is paused. |
 | Adjust **Board amplitude** | Change how strongly the board responds to music. This adjusts the visual response, not the playback volume. |
 
 ## Techniques
@@ -41,20 +41,33 @@ We rebuilt David Hockney’s A Bigger Splash in p5.js using rectangles, lines an
 ## Mechanic ownership
 
 | Mechanic | Contributor | Main file | Description |
+| --- | --- | --- | --- |
 | Time-based | `Chen Chung-En`  | `time-mechanic.js` | Moves the scene through an 80-second day and night cycle. As the sun and moon move, the colours, shadows and pool reflections change. A separate timer controls how each splash rises, falls and leaves fading ripples. |
 | User input | `Jinsa Bai`  | `input-controls.js` | Lets viewers click the pool to create a splash, move the pointer across the water to leave ripples, or drag sideways to create wind. Holding Space bends the board. Releasing it makes the board spring back and sends the unseen diver into the pool. |
 | Perlin noise and randomness | `Aokun Liu`| `perlin-random-mechanic.js` | Gives each palm frond its own shape and uses Perlin noise to create a changing breeze. The fronds sway at slightly different rates, while floating leaves and surface marks drift across the pool in the same wind. |
-| Audio | `Zihaui Liu` | `audio-mechanic.js` | Uses the music’s loudness to control how far the idle diving board bends. During a dive, a creak accompanies the charge, a short tone marks the board’s rebound, and a recorded splash plays when the diver lands. |
+| Audio | `Zihuai Liu` | `audio-mechanic.js` | Uses the music’s loudness to control how far the idle diving board bends. During a dive, a creak accompanies the charge, a short tone marks the board’s rebound, and a recorded splash plays when the diver lands. |
+
+## Audio assets and development history
+
+- `audio/demo.wav`: an 8-second program-generated demonstration loop, according to the audio development record. It is distinct from the archived 24-second Poolside Study track; this 8-second file's generation script is not included.
+- `audio/splash.wav`: an approximately 1.36-second sound effect downloaded online and supplied by the audio contributor, originally named `y2362.wav`. Its original download page, creator and reuse terms have not yet been recorded. Source attribution remains incomplete.
+- [Audio development record](audio-iterations/README.md): two historical implementations. Archive folders are not loaded by the final artwork and are not standalone copies of the complete group project.
 
 ## AI acknowledgement
 
 - Anthropic Claude helped us write parts of artwork-base.js and input-controls.js. We used measurements from the painting and our reference images to place the objects. Claude helped turn those measurements into drawing code using picX() and picY(), including the window reflections, director’s chair and bendable board. It also helped implement the dive and pointer ripples. The dive moves through three states (ready, charging and flying), and a spring calculation makes the board wobble after release. The pointer reuses a fixed set of rings that expand and fade.
 - OpenAI ChatGPT (Codex) helped structure time-mechanic.js and integrate its lighting, shadows, reflections and splash timing. The shadow code projects silhouettes away from the sun. The reflection code flips and compresses the scene objects vertically and clips them to the pool. A separate timer controls each splash as it rises, peaks, falls and fades.
-- OpenAI Codex helped create the initial implementation of audio-mechanic.js. The audio analyser reads the backing track and uses its smoothed loudness to adjust the board’s bend. The code removes the previous audio offset before applying the next one so the motion does not build up across frames.
+- OpenAI Codex helped create the initial audio implementation, including amplitude mapping, playback controls and charge/rebound/landing feedback. The analyser reads the backing track and uses its smoothed loudness to adjust the board’s bend. The code removes the previous audio offset before applying the next one so motion does not build up across frames. Web Audio oscillators synthesize the charge and rebound sounds; state transitions trigger the short effects once. Codex also assisted with the archived prototype's peak detector, demo-music synthesis, tests and documentation, as recorded in that archive. These are separate from the final board-response implementation.
 
 ## External references
 
-`David Hockney Foundation — A Bigger Splash (1967)`(https://www.thedavidhockneyfoundation.org/artwork/3667): source artwork for the composition, architecture, pool and splash.
+[David Hockney Foundation — A Bigger Splash (1967)](https://www.thedavidhockneyfoundation.org/artwork/3667): source artwork for the composition, architecture, pool and splash.
+
+- [p5.Amplitude](https://p5js.org/reference/p5.sound/p5.Amplitude/): track amplitude analysis; visual response uses loudness, not FFT frequency bands.
+- [loadSound](https://v1.p5js.org/reference/p5/loadSound/): load music and the recorded landing effect.
+- [userStartAudio](https://v1.p5js.org/reference/p5/userStartAudio/): enable audio following a user gesture.
+- [lerp](https://p5js.org/reference/p5/lerp/): smooth the visual audio level.
+- [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API): oscillator, low-pass filter, gain nodes and scheduled pitch/gain changes for interaction effects.
 
 `p5.js noise()`: smooth variation used for wind, water deformation and leaf movement.
 // This technique is from https://p5js.org/reference/p5/noise/
@@ -67,7 +80,7 @@ We rebuilt David Hockney’s A Bigger Splash in p5.js using rectangles, lines an
 
 `p5.js clip()`: masks that keep water details and airborne leaves within their drawing areas. // This technique is from https://p5js.org/reference/p5/clip/
 
-`p5.js millis()'`: measures elapsed time for the 80-second day cycle and times each splash and ripple independently. // This technique is from https://p5js.org/reference/p5/millis/
+`p5.js millis()`: measures elapsed time for the 80-second day cycle and times each splash and ripple independently. // This technique is from https://p5js.org/reference/p5/millis/
 
 `MDN Object.keys()`: lists the named colours in the day palette so the same loop can blend every scene colour between time periods. // This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/keys
 
@@ -89,4 +102,4 @@ We rebuilt David Hockney’s A Bigger Splash in p5.js using rectangles, lines an
 
 `MDN Number.isFinite()`: checks that the splash coordinates and strength are finite numbers before the animation starts. // This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/isFinite
 
-`MDN Array.splice()`: removes expired ripples and discards the oldest entries when the list exceeds 36. // This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScr
+`MDN Array.splice()`: removes expired ripples and discards the oldest entries when the list exceeds 36. // This technique is from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/splice
