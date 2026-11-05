@@ -44,7 +44,7 @@ We rebuilt David Hockney’s A Bigger Splash in p5.js using rectangles, lines an
 | Time-based | `Chen Chung-En`  | `time-mechanic.js` | Moves the scene through an 80-second day and night cycle. As the sun and moon move, the colours, shadows and pool reflections change. A separate timer controls how each splash rises, falls and leaves fading ripples. |
 | User input | `Jinsa Bai`  | `input-controls.js` | Lets viewers click the pool to create a splash, move the pointer across the water to leave ripples, or drag sideways to create wind. Holding Space bends the board. Releasing it makes the board spring back and sends the unseen diver into the pool. |
 | Perlin noise and randomness | `Aokun Liu`| `perlin-random-mechanic.js` | Gives each palm frond its own shape and uses Perlin noise to create a changing breeze. The fronds sway at slightly different rates, while floating leaves and surface marks drift across the pool in the same wind. |
-| Audio | `Zihaui Liu` | `audio-mechanic.js` | Uses the music’s loudness to control how far the idle diving board bends. During a dive, a creak accompanies the charge, a short tone marks the board’s rebound, and a recorded splash plays when the diver lands. |
+| Audio | `Zihuai Liu` | `audio-mechanic.js` | Uses the music’s loudness to control how far the idle diving board bends. During a dive, a creak accompanies the charge, a short tone marks the board’s rebound, and a recorded splash plays when the diver lands. |
 
 ## AI acknowledgement
 
