@@ -1,7 +1,6 @@
-// AUDIO MECHANIC — loudness turns the frozen splash into a musical event.
-// Developed with OpenAI Codex (ChatGPT): playback, adaptive peak detection,
-// the meter, comments and tests. Read README.md for the contribution explanation.
-// p5.sound references (the bundled p5 1.x library uses loadSound callbacks):
+// Historical audio prototype — music amplitude peaks trigger splashes.
+// AI assistance: OpenAI Codex helped implement playback, peak detection and the meter.
+// References for the p5 1.x callback-based sound API:
 // https://p5js.org/reference/p5.sound/p5.Amplitude/
 // https://p5js.org/reference/p5/userStartAudio/
 // No timer creates beats: every automatic splash starts from measured audio.
