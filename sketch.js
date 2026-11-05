@@ -18,7 +18,7 @@ function draw() {
   updateInputControls();    // the gust fades
   updateWind();             // smooth wind = noise + gust
   updateTimeMechanic();     // light, splashes, ripples
-  updateAudioMechanic();    // may start a splash
+  updateAudioMechanic();    // board response and dive sound effects
 
   drawScene();              // artwork-base.js calls the drawing functions of each mechanic
   drawBorderText();

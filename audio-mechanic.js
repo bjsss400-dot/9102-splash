@@ -1,5 +1,11 @@
 // Audio mechanic — music amplitude drives the diving board.
 // AI assistance: initial implementation created with OpenAI Codex.
+// p5.sound: load files, analyse track amplitude and enable user-initiated playback.
+// https://p5js.org/reference/p5.sound/p5.Amplitude/
+// https://v1.p5js.org/reference/p5/loadSound/
+// https://v1.p5js.org/reference/p5/userStartAudio/
+// Web Audio: synthesize effects with oscillator/filter/gain nodes and pitch/gain envelopes.
+// https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API
 // Replace this path with a file inside audio/ to use your own music.
 const AUDIO_FILE = 'audio/demo.wav';
 const SPLASH_FILE = 'audio/splash.wav';
@@ -118,7 +124,7 @@ function drawAudioMeter() {
   pop();
 }
 
-// ---- Interaction sound effects (Web Audio; no extra sound files required) ----
+// ---- Interaction effects: synthesized creak/rebound and recorded landing splash ----
 // One continuous creak follows charge. Short sounds happen once per transition.
 let boardEffects = { context: null, creak: null, previous: 'ready', charge: 0 };
 
