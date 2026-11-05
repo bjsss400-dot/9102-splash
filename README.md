@@ -52,6 +52,8 @@ We rebuilt David Hockney’s A Bigger Splash in p5.js using rectangles, lines an
 - OpenAI ChatGPT (Codex) helped structure time-mechanic.js and integrate its lighting, shadows, reflections and splash timing. The shadow code projects silhouettes away from the sun. The reflection code flips and compresses the scene objects vertically and clips them to the pool. A separate timer controls each splash as it rises, peaks, falls and fades.
 - OpenAI Codex helped create the initial implementation of audio-mechanic.js. The audio analyser reads the backing track and uses its smoothed loudness to adjust the board’s bend. The code removes the previous audio offset before applying the next one so the motion does not build up across frames.
 
+- Aokun Liu — OpenAI ChatGPT (Codex) helped generate and refine code for frond variation, wind, water reflections and falling leaves in `perlin-random-mechanic.js`. Stored random values create differences, while Perlin noise drives smooth motion. The reflection lines use perspective and shared daylight values; timed states move leaves through falling, floating and sinking.
+
 ## External references
 
 `David Hockney Foundation — A Bigger Splash (1967)`(https://www.thedavidhockneyfoundation.org/artwork/3667): source artwork for the composition, architecture, pool and splash.
