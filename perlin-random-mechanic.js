@@ -5,6 +5,10 @@
 // Green leaves settle onto the water, float, then fade gradually as they sink.
 // The existing wind, palms and splash behaviour are preserved.
 // Built on the group's existing palms and splash drawing.
+// AI assistance: OpenAI ChatGPT (Codex) helped generate and refine the frond,
+// wind, water-reflection and falling-leaf code in this module.
+// Stored randomness sets variation; noise smooths motion. Pool projection adds
+// perspective, shared lighting controls reflections, and timed states control leaves.
 // References: https://p5js.org/reference/p5/noise/
 //             https://p5js.org/reference/p5/random/
 //             https://p5js.org/reference/p5/randomSeed/
